@@ -1,16 +1,17 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
-using Avalonia.Data;
-using Avalonia.Reactive;
-using Avalonia.Styling;
+using System.Diagnostics;
 
 namespace Avalonia
 {
     /// <summary>
     /// Base class for styled properties.
     /// </summary>
-    public abstract class StyledPropertyBase<TValue> : AvaloniaProperty<TValue>, IStyledPropertyAccessor
+    public class StyledPropertyBase<TValue> : AvaloniaProperty<TValue>, IStyledPropertyAccessor
     {
-        private readonly bool _inherits;
+        private bool _inherits;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StyledPropertyBase{T}"/> class.
@@ -19,26 +20,24 @@ namespace Avalonia
         /// <param name="ownerType">The type of the class that registers the property.</param>
         /// <param name="metadata">The property metadata.</param>
         /// <param name="inherits">Whether the property inherits its value.</param>
-        /// <param name="validate">A value validation callback.</param>
         /// <param name="notifying">A <see cref="AvaloniaProperty.Notifying"/> callback.</param>
         protected StyledPropertyBase(
             string name,
             Type ownerType,            
             StyledPropertyMetadata<TValue> metadata,
             bool inherits = false,
-            Func<TValue, bool>? validate = null,
-            Action<IAvaloniaObject, bool>? notifying = null)
+            Action<IAvaloniaObject, bool> notifying = null)
                 : base(name, ownerType, metadata, notifying)
         {
-            _inherits = inherits;
-            ValidateValue = validate;
-            HasCoercion |= metadata.CoerceValue != null;
+            Contract.Requires<ArgumentNullException>(name != null);
+            Contract.Requires<ArgumentNullException>(ownerType != null);
 
-            if (validate?.Invoke(metadata.DefaultValue) == false)
+            if (name.Contains("."))
             {
-                throw new ArgumentException(
-                    $"'{metadata.DefaultValue}' is not a valid default value for '{name}'.");
+                throw new ArgumentException("'name' may not contain periods.");
             }
+
+            _inherits = inherits;
         }
 
         /// <summary>
@@ -61,35 +60,14 @@ namespace Avalonia
         public override bool Inherits => _inherits;
 
         /// <summary>
-        /// Gets the value validation callback for the property.
-        /// </summary>
-        public Func<TValue, bool>? ValidateValue { get; }
-
-        /// <summary>
-        /// Gets a value indicating whether this property has any value coercion callbacks defined
-        /// in its metadata.
-        /// </summary>
-        internal bool HasCoercion { get; private set; }
-
-        public TValue CoerceValue(IAvaloniaObject instance, TValue baseValue)
-        {
-            var metadata = GetMetadata(instance.GetType());
-
-            if (metadata.CoerceValue != null)
-            {
-                return metadata.CoerceValue.Invoke(instance, baseValue);
-            }
-
-            return baseValue;
-        }
-
-        /// <summary>
         /// Gets the default value for the property on the specified type.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>The default value.</returns>
         public TValue GetDefaultValue(Type type)
         {
+            Contract.Requires<ArgumentNullException>(type != null);
+
             return GetMetadata(type).DefaultValue;
         }
 
@@ -102,7 +80,6 @@ namespace Avalonia
         /// </returns>
         public new StyledPropertyMetadata<TValue> GetMetadata(Type type)
         {
-            _ = type ?? throw new ArgumentNullException(nameof(type));
             return (StyledPropertyMetadata<TValue>)base.GetMetadata(type);
         }
 
@@ -143,18 +120,31 @@ namespace Avalonia
         /// <param name="metadata">The metadata.</param>
         public void OverrideMetadata(Type type, StyledPropertyMetadata<TValue> metadata)
         {
-            if (ValidateValue != null)
+            base.OverrideMetadata(type, metadata);
+        }
+
+        /// <summary>
+        /// Overrides the validation function for the specified type.
+        /// </summary>
+        /// <typeparam name="THost">The type.</typeparam>
+        /// <param name="validate">The validation function.</param>
+        public void OverrideValidation<THost>(Func<THost, TValue, TValue> validate)
+            where THost : IAvaloniaObject
+        {
+            Func<IAvaloniaObject, TValue, TValue> f;
+
+            if (validate != null)
             {
-                if (!ValidateValue(metadata.DefaultValue))
-                {
-                    throw new ArgumentException(
-                        $"'{metadata.DefaultValue}' is not a valid default value for '{Name}'.");
-                }
+                f = Cast(validate);
+            }
+            else
+            {
+                // Passing null to the validation function means that the property metadata merge
+                // will take the base validation function, so instead use an empty validation.
+                f = (o, v) => v;
             }
 
-            HasCoercion |= metadata.CoerceValue != null;
-
-            base.OverrideMetadata(type, metadata);
+            base.OverrideMetadata(typeof(THost), new StyledPropertyMetadata<TValue>(validate: f));
         }
 
         /// <summary>
@@ -167,98 +157,19 @@ namespace Avalonia
         }
 
         /// <inheritdoc/>
-        object? IStyledPropertyAccessor.GetDefaultValue(Type type) => GetDefaultBoxedValue(type);
-
-        /// <inheritdoc/>
-        internal override void RouteClearValue(AvaloniaObject o)
+        Func<IAvaloniaObject, object, object> IStyledPropertyAccessor.GetValidationFunc(Type type)
         {
-            o.ClearValue<TValue>(this);
+            Contract.Requires<ArgumentNullException>(type != null);
+            return ((IStyledPropertyMetadata)base.GetMetadata(type)).Validate;
         }
 
         /// <inheritdoc/>
-        internal override object? RouteGetValue(AvaloniaObject o)
+        object IStyledPropertyAccessor.GetDefaultValue(Type type) => GetDefaultValue(type);
+
+        [DebuggerHidden]
+        private Func<IAvaloniaObject, TValue, TValue> Cast<THost>(Func<THost, TValue, TValue> validate)
         {
-            return o.GetValue<TValue>(this);
-        }
-
-        /// <inheritdoc/>
-        internal override object? RouteGetBaseValue(AvaloniaObject o, BindingPriority maxPriority)
-        {
-            var value = o.GetBaseValue<TValue>(this, maxPriority);
-            return value.HasValue ? value.Value : AvaloniaProperty.UnsetValue;
-        }
-
-        /// <inheritdoc/>
-        internal override IDisposable? RouteSetValue(
-            AvaloniaObject o,
-            object? value,
-            BindingPriority priority)
-        {
-            var v = TryConvert(value);
-
-            if (v.HasValue)
-            {
-                return o.SetValue<TValue>(this, (TValue)v.Value!, priority);
-            }
-            else if (v.Type == BindingValueType.UnsetValue)
-            {
-                o.ClearValue(this);
-            }
-            else if (v.HasError)
-            {
-                throw v.Error!;
-            }
-
-            return null;
-        }
-
-        /// <inheritdoc/>
-        internal override IDisposable RouteBind(
-            AvaloniaObject o,
-            IObservable<BindingValue<object?>> source,
-            BindingPriority priority)
-        {
-            var adapter = TypedBindingAdapter<TValue>.Create(o, this, source);
-            return o.Bind<TValue>(this, adapter, priority);
-        }
-
-        /// <inheritdoc/>
-        internal override void RouteInheritanceParentChanged(
-            AvaloniaObject o,
-            AvaloniaObject? oldParent)
-        {
-            o.InheritanceParentChanged(this, oldParent);
-        }
-
-        internal override ISetterInstance CreateSetterInstance(IStyleable target, object? value)
-        {
-            if (value is IBinding binding)
-            {
-                return new PropertySetterBindingInstance<TValue>(
-                    target,
-                    this,
-                    binding);
-            }
-            else if (value is ITemplate template && !typeof(ITemplate).IsAssignableFrom(PropertyType))
-            {
-                return new PropertySetterTemplateInstance<TValue>(
-                    target,
-                    this,
-                    template);
-            }
-            else
-            {
-                return new PropertySetterInstance<TValue>(
-                    target,
-                    this,
-                    (TValue)value!);
-            }
-        }
-
-        private object? GetDefaultBoxedValue(Type type)
-        {
-            _ = type ?? throw new ArgumentNullException(nameof(type));
-            return GetMetadata(type).DefaultValue;
+            return (o, v) => validate((THost)o, v);
         }
     }
 }

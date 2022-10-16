@@ -1,8 +1,12 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System.Collections.Specialized;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Animation;
+using Avalonia.Controls.Generators;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Utils;
 using Avalonia.Data;
@@ -29,13 +33,13 @@ namespace Avalonia.Controls.Presenters
                 (o, v) => o.SelectedIndex = v);
 
         /// <summary>
-        /// Defines the <see cref="PageTransition"/> property.
+        /// Defines the <see cref="Transition"/> property.
         /// </summary>
-        public static readonly StyledProperty<IPageTransition?> PageTransitionProperty =
-            Carousel.PageTransitionProperty.AddOwner<CarouselPresenter>();
+        public static readonly StyledProperty<IPageTransition> TransitionProperty =
+            Carousel.TransitionProperty.AddOwner<CarouselPresenter>();
 
         private int _selectedIndex = -1;
-        private Task? _currentTransition;
+        private Task _currentTransition;
         private int _queuedTransitionIndex = -1;
 
         /// <summary>
@@ -43,8 +47,7 @@ namespace Avalonia.Controls.Presenters
         /// </summary>
         static CarouselPresenter()
         {
-            IsVirtualizedProperty.Changed.AddClassHandler<CarouselPresenter>((x, e) => x.IsVirtualizedChanged(e));
-            SelectedIndexProperty.Changed.AddClassHandler<CarouselPresenter>((x, e) => x.SelectedIndexChanged(e));
+            SelectedIndexProperty.Changed.AddClassHandler<CarouselPresenter>(x => x.SelectedIndexChanged);
         }
 
         /// <summary>
@@ -85,83 +88,40 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Gets or sets a transition to use when switching pages.
         /// </summary>
-        public IPageTransition? PageTransition
+        public IPageTransition Transition
         {
-            get { return GetValue(PageTransitionProperty); }
-            set { SetValue(PageTransitionProperty, value); }
+            get { return GetValue(TransitionProperty); }
+            set { SetValue(TransitionProperty, value); }
+        }
+
+        /// <inheritdoc/>
+        protected override void PanelCreated(IPanel panel)
+        {
+#pragma warning disable 4014
+            MoveToPage(-1, SelectedIndex);
+#pragma warning restore 4014
         }
 
         /// <inheritdoc/>
         protected override void ItemsChanged(NotifyCollectionChangedEventArgs e)
         {
-            if (!IsVirtualized)
+            // TODO: Handle items changing.           
+            switch (e.Action)
             {
-                base.ItemsChanged(e);
+                case NotifyCollectionChangedAction.Remove:
+                    if (!IsVirtualized)
+                    {
+                        var generator = ItemContainerGenerator;
+                        var containers = generator.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
+                        Panel.Children.RemoveAll(containers.Select(x => x.ContainerControl));
+                    }
+                    break;
 
-                if (Items == null || SelectedIndex >= Items.Count())
-                {
-                    SelectedIndex = Items.Count() - 1;
-                }
-
-                foreach (var c in ItemContainerGenerator.Containers)
-                {
-                    c.ContainerControl.IsVisible = c.Index == SelectedIndex;
-                }
             }
-            else if (SelectedIndex != -1 && Panel != null)
-            {
-                switch (e.Action)
-                {
-                    case NotifyCollectionChangedAction.Add:
-                        if (e.NewStartingIndex > SelectedIndex)
-                        {
-                            return;
-                        }
-                        break;
-                    case NotifyCollectionChangedAction.Remove:
-                        if (e.OldStartingIndex > SelectedIndex)
-                        {
-                            return;
-                        }
-                        break;
-                    case NotifyCollectionChangedAction.Replace:
-                        if (e.OldStartingIndex > SelectedIndex ||
-                            e.OldStartingIndex + e.OldItems!.Count - 1 < SelectedIndex)
-                        {
-                            return;
-                        }
-                        break;
-                    case NotifyCollectionChangedAction.Move:
-                        if (e.OldStartingIndex > SelectedIndex &&
-                            e.NewStartingIndex > SelectedIndex)
-                        {
-                            return;
-                        }
-                        break;
-                }
-
-                if (Items == null || SelectedIndex >= Items.Count())
-                {
-                    SelectedIndex = Items.Count() - 1;
-                }
-
-                Panel.Children.Clear();
-                ItemContainerGenerator.Clear();
-
-                if (SelectedIndex != -1)
-                {
-                    GetOrCreateContainer(SelectedIndex);
-                }
-            }
-        }
-
-        protected override void PanelCreated(IPanel panel)
-        {
-            ItemsChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         /// <summary>
-        /// Moves to the selected page, animating if a <see cref="PageTransition"/> is set.
+        /// Moves to the selected page, animating if a <see cref="Transition"/> is set.
         /// </summary>
         /// <param name="fromIndex">The index of the old page.</param>
         /// <param name="toIndex">The index of the new page.</param>
@@ -171,12 +131,12 @@ namespace Avalonia.Controls.Presenters
             if (fromIndex != toIndex)
             {
                 var generator = ItemContainerGenerator;
-                IControl? from = null;
-                IControl? to = null;
+                IControl from = null;
+                IControl to = null;
 
                 if (fromIndex != -1)
                 {
-                    from = generator.ContainerFromIndex(fromIndex);
+                    from = ItemContainerGenerator.ContainerFromIndex(fromIndex);
                 }
 
                 if (toIndex != -1)
@@ -184,9 +144,9 @@ namespace Avalonia.Controls.Presenters
                     to = GetOrCreateContainer(toIndex);
                 }
 
-                if (PageTransition != null && (from != null || to != null))
+                if (Transition != null && (from != null || to != null))
                 {
-                    await PageTransition.Start((Visual?)from, (Visual?)to, fromIndex < toIndex, default);
+                    await Transition.Start((Visual)from, (Visual)to, fromIndex < toIndex);
                 }
                 else if (to != null)
                 {
@@ -197,7 +157,7 @@ namespace Avalonia.Controls.Presenters
                 {
                     if (IsVirtualized)
                     {
-                        Panel!.Children.Remove(from);
+                        Panel.Children.Remove(from);
                         generator.Dematerialize(fromIndex, 1);
                     }
                     else
@@ -208,31 +168,19 @@ namespace Avalonia.Controls.Presenters
             }
         }
 
-        private IControl? GetOrCreateContainer(int index)
+        private IControl GetOrCreateContainer(int index)
         {
             var container = ItemContainerGenerator.ContainerFromIndex(index);
 
-            if (container == null && IsVirtualized)
+            if (container == null)
             {
-                var item = Items!.Cast<object>().ElementAt(index);
-                var materialized = ItemContainerGenerator.Materialize(index, item);
-                Panel!.Children.Add(materialized.ContainerControl);
+                var item = Items.Cast<object>().ElementAt(index);
+                var materialized = ItemContainerGenerator.Materialize(index, item, MemberSelector);
+                Panel.Children.Add(materialized.ContainerControl);
                 container = materialized.ContainerControl;
             }
 
             return container;
-        }
-
-        /// <summary>
-        /// Called when the <see cref="IsVirtualized"/> property changes.
-        /// </summary>
-        /// <param name="e">The event args.</param>
-        private void IsVirtualizedChanged(AvaloniaPropertyChangedEventArgs e)
-        {
-            if (Panel != null)
-            {
-                ItemsChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-            }
         }
 
         /// <summary>
@@ -245,8 +193,8 @@ namespace Avalonia.Controls.Presenters
             {
                 if (_currentTransition == null)
                 {
-                    int fromIndex = (int)e.OldValue!;
-                    int toIndex = (int)e.NewValue!;
+                    int fromIndex = (int)e.OldValue;
+                    int toIndex = (int)e.NewValue;
 
                     for (;;)
                     {
@@ -268,7 +216,7 @@ namespace Avalonia.Controls.Presenters
                 }
                 else
                 {
-                    _queuedTransitionIndex = (int)e.NewValue!;
+                    _queuedTransitionIndex = (int)e.NewValue;
                 }
             }
         }

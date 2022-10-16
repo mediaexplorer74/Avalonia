@@ -1,6 +1,8 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Linq;
-using Avalonia.Platform;
 using SharpDX;
 using SharpDX.Direct2D1;
 using SharpDX.Mathematics.Interop;
@@ -38,10 +40,6 @@ namespace Avalonia.Direct2D1
         {
             return new Rect(new Point(r.Left, r.Top), new Point(r.Right, r.Bottom));
         }
-
-        public static PixelSize ToAvalonia(this Size2 p) => new PixelSize(p.Width, p.Height);
-
-        public static Vector ToAvaloniaVector(this Size2F p) => new Vector(p.Width, p.Height);
 
         public static RawRectangleF ToSharpDX(this Rect r)
         {
@@ -90,16 +88,14 @@ namespace Avalonia.Direct2D1
                 return CapStyle.Triangle;
         }
 
-        public static Guid ToWic(this Platform.PixelFormat format, Platform.AlphaFormat alphaFormat)
+        public static Guid ToWic(this Platform.PixelFormat format)
         {
-            bool isPremul = alphaFormat == AlphaFormat.Premul;
-
             if (format == Platform.PixelFormat.Rgb565)
                 return SharpDX.WIC.PixelFormat.Format16bppBGR565;
             if (format == Platform.PixelFormat.Bgra8888)
-                return isPremul ? SharpDX.WIC.PixelFormat.Format32bppPBGRA : SharpDX.WIC.PixelFormat.Format32bppBGRA;
+                return SharpDX.WIC.PixelFormat.Format32bppPBGRA;
             if (format == Platform.PixelFormat.Rgba8888)
-                return isPremul ? SharpDX.WIC.PixelFormat.Format32bppPRGBA : SharpDX.WIC.PixelFormat.Format32bppRGBA;
+                return SharpDX.WIC.PixelFormat.Format32bppPRGBA;
             throw new ArgumentException("Unknown pixel format");
         }
 
@@ -107,43 +103,27 @@ namespace Avalonia.Direct2D1
         /// Converts a pen to a Direct2D stroke style.
         /// </summary>
         /// <param name="pen">The pen to convert.</param>
-        /// <param name="renderTarget">The render target.</param>
+        /// <param name="target">The render target.</param>
         /// <returns>The Direct2D brush.</returns>
-        public static StrokeStyle ToDirect2DStrokeStyle(this Avalonia.Media.IPen pen, SharpDX.Direct2D1.RenderTarget renderTarget)
+        public static StrokeStyle ToDirect2DStrokeStyle(this Avalonia.Media.Pen pen, SharpDX.Direct2D1.RenderTarget target)
         {
-            return pen.ToDirect2DStrokeStyle(Direct2D1Platform.Direct2D1Factory);
-        }
-
-        /// <summary>
-        /// Converts a pen to a Direct2D stroke style.
-        /// </summary>
-        /// <param name="pen">The pen to convert.</param>
-        /// <param name="factory">The factory associated with this resource.</param>
-        /// <returns>The Direct2D brush.</returns>
-        public static StrokeStyle ToDirect2DStrokeStyle(this Avalonia.Media.IPen pen, Factory factory)
-        {
-            var d2dLineCap = pen.LineCap.ToDirect2D();
-
             var properties = new StrokeStyleProperties
             {
                 DashStyle = DashStyle.Solid,
                 MiterLimit = (float)pen.MiterLimit,
                 LineJoin = pen.LineJoin.ToDirect2D(),
-                StartCap = d2dLineCap,
-                EndCap = d2dLineCap,
-                DashCap = d2dLineCap
+                StartCap = pen.StartLineCap.ToDirect2D(),
+                EndCap = pen.EndLineCap.ToDirect2D(),
+                DashCap = pen.DashCap.ToDirect2D()
             };
-            float[] dashes = null;
+            var dashes = new float[0];
             if (pen.DashStyle?.Dashes != null && pen.DashStyle.Dashes.Count > 0)
             {
                 properties.DashStyle = DashStyle.Custom;
                 properties.DashOffset = (float)pen.DashStyle.Offset;
-                dashes = pen.DashStyle.Dashes.Select(x => (float)x).ToArray();
+                dashes = pen.DashStyle?.Dashes.Select(x => (float)x).ToArray();
             }
-
-            dashes = dashes ?? Array.Empty<float>();
-
-            return new StrokeStyle(factory, properties, dashes);
+            return new StrokeStyle(target.Factory, properties, dashes);
         }
 
         /// <summary>

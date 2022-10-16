@@ -1,14 +1,10 @@
 
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Avalonia.Styling;
 
 namespace Avalonia.Controls
 {
     public static class Design
     {
-        private static Dictionary<object, Control?>? _previewWith;
-
         public static bool IsDesignMode { get; internal set; }
 
         public static readonly AttachedProperty<double> HeightProperty = AvaloniaProperty
@@ -49,45 +45,26 @@ namespace Avalonia.Controls
         {
             return control.GetValue(DataContextProperty);
         }
-        
-        public static readonly AttachedProperty<Control?> PreviewWithProperty = AvaloniaProperty
-            .RegisterAttached<AvaloniaObject, Control?>("PreviewWith", typeof (Design));
 
-        public static void SetPreviewWith(AvaloniaObject target, Control? control)
+        static readonly ConditionalWeakTable<object, Control> Substitutes = new ConditionalWeakTable<object, Control>();
+
+        public static readonly AttachedProperty<Control> PreviewWithProperty = AvaloniaProperty
+            .RegisterAttached<AvaloniaObject, Control>("PreviewWith", typeof (Design));
+
+        public static void SetPreviewWith(object target, Control control)
         {
-            target.SetValue(PreviewWithProperty, control);
+            Substitutes.Remove(target);
+            Substitutes.Add(target, control);
         }
 
-        public static void SetPreviewWith(ResourceDictionary target, Control? control)
+        public static Control GetPreviewWith(object target)
         {
-            _previewWith ??= new();
-            _previewWith[target] = control;
+            Control rv;
+            Substitutes.TryGetValue(target, out rv);
+            return rv;
         }
 
-        public static Control? GetPreviewWith(AvaloniaObject target)
-        {
-            return target.GetValue(PreviewWithProperty);
-        }
-
-        public static Control? GetPreviewWith(ResourceDictionary target)
-        {
-            return _previewWith?[target];
-        }
-
-        public static readonly AttachedProperty<IStyle> DesignStyleProperty = AvaloniaProperty
-            .RegisterAttached<Control, IStyle>("DesignStyle", typeof(Design));
-
-        public static void SetDesignStyle(Control control, IStyle value)
-        {
-            control.SetValue(DesignStyleProperty, value);
-        }
-
-        public static IStyle GetDesignStyle(Control control)
-        {
-            return control.GetValue(DesignStyleProperty);
-        }
-
-        public static void ApplyDesignModeProperties(Control target, Control source)
+        internal static void ApplyDesignerProperties(Control target, Control source)
         {
             if (source.IsSet(WidthProperty))
                 target.Width = source.GetValue(WidthProperty);
@@ -95,8 +72,6 @@ namespace Avalonia.Controls
                 target.Height = source.GetValue(HeightProperty);
             if (source.IsSet(DataContextProperty))
                 target.DataContext = source.GetValue(DataContextProperty);
-            if (source.IsSet(DesignStyleProperty))
-                target.Styles.Add(source.GetValue(DesignStyleProperty));
         }
     }
 }

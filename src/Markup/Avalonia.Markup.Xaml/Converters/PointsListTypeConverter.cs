@@ -1,32 +1,40 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using OmniXaml.TypeConversion;
 
 namespace Avalonia.Markup.Xaml.Converters
 {
-    using System.ComponentModel;
-    using Avalonia.Utilities;
-
-    public class PointsListTypeConverter : TypeConverter
+    public class PointsListTypeConverter : ITypeConverter
     {
-        public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+        public bool CanConvertFrom(IValueContext context, Type sourceType)
         {
             return sourceType == typeof(string);
         }
 
-        public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+        public bool CanConvertTo(IValueContext context, Type destinationType)
         {
-            var points = new List<Point>();
+            return false;
+        }
 
-            using (var tokenizer = new StringTokenizer((string)value, CultureInfo.InvariantCulture, exceptionMessage: "Invalid PointsList."))
+        public object ConvertFrom(IValueContext context, CultureInfo culture, object value)
+        {
+            string strValue = (string)value;
+            string[] pointStrs = strValue.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var result = new List<Point>(pointStrs.Length);
+            foreach (var pointStr in pointStrs)
             {
-                while (tokenizer.TryReadDouble(out double x))
-                {
-                    points.Add(new Point(x, tokenizer.ReadDouble()));
-                }
+                result.Add(Point.Parse(pointStr, culture));
             }
+            return result;
+        }
 
-            return points;
+        public object ConvertTo(IValueContext context, CultureInfo culture, object value, Type destinationType)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -1,16 +1,13 @@
-using Avalonia.Controls.Primitives.PopupPositioning;
-using Avalonia.Metadata;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
 
 namespace Avalonia.Platform
 {
     /// <summary>
     /// Defines a platform-specific popup window implementation.
     /// </summary>
-    [Unstable]
     public interface IPopupImpl : IWindowBaseImpl
     {
-        IPopupPositioner PopupPositioner { get; }
 
-        void SetWindowManagerAddShadowHint(bool enabled);
     }
 }

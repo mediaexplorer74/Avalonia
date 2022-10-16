@@ -1,5 +1,7 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
-using System.Reactive.Concurrency;
 using Avalonia.Input;
 using Avalonia.Layout;
 
@@ -46,7 +48,7 @@ namespace Avalonia.Controls
         static Canvas()
         {
             ClipToBoundsProperty.OverrideDefaultValue<Canvas>(false);
-            AffectsParentArrange<Canvas>(LeftProperty, TopProperty, RightProperty, BottomProperty);
+            AffectsCanvasArrange(LeftProperty, TopProperty, RightProperty, BottomProperty);
         }
 
         /// <summary>
@@ -134,9 +136,8 @@ namespace Avalonia.Controls
         /// </summary>
         /// <param name="direction">The movement direction.</param>
         /// <param name="from">The control from which movement begins.</param>
-        /// <param name="wrap">Whether to wrap around when the first or last item is reached.</param>
         /// <returns>The control.</returns>
-        IInputElement? INavigableContainer.GetControl(NavigationDirection direction, IInputElement? from, bool wrap)
+        IInputElement INavigableContainer.GetControl(NavigationDirection direction, IInputElement from)
         {
             // TODO: Implement this
             return null;
@@ -160,48 +161,6 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Arranges a single child.
-        /// </summary>
-        /// <param name="child">The child to arrange.</param>
-        /// <param name="finalSize">The size allocated to the canvas.</param>
-        protected virtual void ArrangeChild(Control child, Size finalSize)
-        {
-            double x = 0.0;
-            double y = 0.0;
-            double elementLeft = GetLeft(child);
-
-            if (!double.IsNaN(elementLeft))
-            {
-                x = elementLeft;
-            }
-            else
-            {
-                // Arrange with right.
-                double elementRight = GetRight(child);
-                if (!double.IsNaN(elementRight))
-                {
-                    x = finalSize.Width - child.DesiredSize.Width - elementRight;
-                }
-            }
-
-            double elementTop = GetTop(child);
-            if (!double.IsNaN(elementTop))
-            {
-                y = elementTop;
-            }
-            else
-            {
-                double elementBottom = GetBottom(child);
-                if (!double.IsNaN(elementBottom))
-                {
-                    y = finalSize.Height - child.DesiredSize.Height - elementBottom;
-                }
-            }
-
-            child.Arrange(new Rect(new Point(x, y), child.DesiredSize));
-        }
-
-        /// <summary>
         /// Arranges the control's children.
         /// </summary>
         /// <param name="finalSize">The size allocated to the control.</param>
@@ -210,10 +169,66 @@ namespace Avalonia.Controls
         {
             foreach (Control child in Children)
             {
-                ArrangeChild(child, finalSize);
+                double x = 0.0;
+                double y = 0.0;
+                double elementLeft = GetLeft(child);
+
+                if (!double.IsNaN(elementLeft))
+                {
+                    x = elementLeft;
+                }
+                else
+                {
+                    // Arrange with right.
+                    double elementRight = GetRight(child);
+                    if (!double.IsNaN(elementRight))
+                    {
+                        x = finalSize.Width - child.DesiredSize.Width - elementRight;
+                    }
+                }
+
+                double elementTop = GetTop(child);
+                if (!double.IsNaN(elementTop) )
+                {
+                    y = elementTop;
+                }
+                else
+                {
+                    double elementBottom = GetBottom(child);
+                    if (!double.IsNaN(elementBottom))
+                    {
+                        y = finalSize.Height - child.DesiredSize.Height - elementBottom;
+                    }
+                }
+
+                child.Arrange(new Rect(new Point(x, y), child.DesiredSize));
             }
 
             return finalSize;
+        }
+
+        /// <summary>
+        /// Marks a property on a child as affecting the canvas' arrangement.
+        /// </summary>
+        /// <param name="properties">The properties.</param>
+        private static void AffectsCanvasArrange(params AvaloniaProperty[] properties)
+        {
+            foreach (var property in properties)
+            {
+                property.Changed.Subscribe(AffectsCanvasArrangeInvalidate);
+            }
+        }
+
+        /// <summary>
+        /// Calls <see cref="Layoutable.InvalidateArrange"/> on the parent of the control whose
+        /// property changed, if that parent is a canvas.
+        /// </summary>
+        /// <param name="e">The event args.</param>
+        private static void AffectsCanvasArrangeInvalidate(AvaloniaPropertyChangedEventArgs e)
+        {
+            var control = e.Sender as IControl;
+            var canvas = control?.VisualParent as Canvas;
+            canvas?.InvalidateArrange();
         }
     }
 }

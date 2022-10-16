@@ -1,33 +1,28 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System;
 using Avalonia.Media;
-using Avalonia.Metadata;
 using Avalonia.Rendering.Utilities;
-using Avalonia.Utilities;
 using SharpDX.Direct2D1;
 
 namespace Avalonia.Direct2D1.Media
 {
-    [Unstable]
     public sealed class ImageBrushImpl : BrushImpl
     {
-        private readonly OptionalDispose<Bitmap> _bitmap;
-
-        private readonly Avalonia.Media.Imaging.BitmapInterpolationMode _bitmapInterpolationMode;
-
         public ImageBrushImpl(
             ITileBrush brush,
             SharpDX.Direct2D1.RenderTarget target,
             BitmapImpl bitmap,
             Size targetSize)
         {
-            var dpi = new Vector(target.DotsPerInch.Width, target.DotsPerInch.Height);
-            var calc = new TileBrushCalculator(brush, bitmap.PixelSize.ToSizeWithDpi(dpi), targetSize);
+            var calc = new TileBrushCalculator(brush, new Size(bitmap.PixelWidth, bitmap.PixelHeight), targetSize);
 
             if (!calc.NeedsIntermediate)
             {
-                _bitmap = bitmap.GetDirect2DBitmap(target);
                 PlatformBrush = new BitmapBrush(
                     target,
-                    _bitmap.Value,
+                    bitmap.GetDirect2DBitmap(target),
                     GetBitmapBrushProperties(brush),
                     GetBrushProperties(brush, calc.DestinationRect));
             }
@@ -42,13 +37,11 @@ namespace Avalonia.Direct2D1.Media
                         GetBrushProperties(brush, calc.DestinationRect));
                 }
             }
-
-            _bitmapInterpolationMode = brush.BitmapInterpolationMode;
         }
 
         public override void Dispose()
         {
-            _bitmap.Dispose();
+            ((BitmapBrush)PlatformBrush)?.Bitmap.Dispose();
             base.Dispose();
         }
 
@@ -99,14 +92,12 @@ namespace Avalonia.Direct2D1.Media
 
             using (var context = new RenderTarget(result).CreateDrawingContext(null))
             {
-                var dpi = new Vector(target.DotsPerInch.Width, target.DotsPerInch.Height);
-                var rect = new Rect(bitmap.PixelSize.ToSizeWithDpi(dpi));
+                var rect = new Rect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight);
 
                 context.Clear(Colors.Transparent);
                 context.PushClip(calc.IntermediateClip);
                 context.Transform = calc.IntermediateTransform;
-                
-                context.DrawBitmap(RefCountable.CreateUnownedNotClonable(bitmap), 1, rect, rect, _bitmapInterpolationMode);
+                context.DrawImage(bitmap, 1, rect, rect);
                 context.PopClip();
             }
 

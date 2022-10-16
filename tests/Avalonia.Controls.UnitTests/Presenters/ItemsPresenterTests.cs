@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System.Collections.ObjectModel;
 using System.Linq;
 using Moq;
@@ -61,31 +64,12 @@ namespace Avalonia.Controls.UnitTests.Presenters
         }
 
         [Fact]
-        public void Should_Create_Containers_Only_Once()
-        {
-            var parent = new TestItemsControl();
-            var target = new ItemsPresenter
-            {
-                Items = new[] { "foo", "bar" },
-                [StyledElement.TemplatedParentProperty] = parent,
-            };
-            var raised = 0;
-
-            parent.ItemContainerGenerator.Materialized += (s, e) => ++raised;
-
-            target.ApplyTemplate();
-
-            Assert.Equal(2, target.Panel.Children.Count);
-            Assert.Equal(2, raised);
-        }
-
-        [Fact]
         public void ItemContainerGenerator_Should_Be_Picked_Up_From_TemplatedControl()
         {
             var parent = new TestItemsControl();
             var target = new ItemsPresenter
             {
-                [StyledElement.TemplatedParentProperty] = parent,
+                TemplatedParent = parent,
             };
 
             Assert.IsType<ItemContainerGenerator<TestItem>>(target.ItemContainerGenerator);
@@ -103,7 +87,7 @@ namespace Avalonia.Controls.UnitTests.Presenters
             target.ApplyTemplate();
             items.RemoveAt(0);
 
-            Assert.Single(target.Panel.Children);
+            Assert.Equal(1, target.Panel.Children.Count);
             Assert.Equal("bar", ((ContentPresenter)target.Panel.Children[0]).Content);
             Assert.Equal("bar", ((ContentPresenter)target.ItemContainerGenerator.ContainerFromIndex(0)).Content);
         }
@@ -236,7 +220,7 @@ namespace Avalonia.Controls.UnitTests.Presenters
             {
                 VirtualizationMode = ItemVirtualizationMode.None,
                 Items = items,
-                ItemTemplate = new FuncDataTemplate<string>((x, _) => new TextBlock { Height = 10 }),
+                ItemTemplate = new FuncDataTemplate<string>(x => new TextBlock { Height = 10 }),
             };
 
             target.ApplyTemplate();
@@ -324,6 +308,46 @@ namespace Avalonia.Controls.UnitTests.Presenters
             var child = target.GetVisualChildren().Single();
 
             Assert.Equal(target.Panel, child);
+        }
+
+        [Fact]
+        public void MemberSelector_Should_Select_Member()
+        {
+            var target = new ItemsPresenter
+            {
+                Items = new[] { new Item("Foo"), new Item("Bar") },
+                MemberSelector = new FuncMemberSelector<Item, string>(x => x.Value),
+            };
+
+            target.ApplyTemplate();
+
+            var text = target.Panel.Children
+                .Cast<ContentPresenter>()
+                .Select(x => x.Content)
+                .ToList();
+
+            Assert.Equal(new[] { "Foo", "Bar" }, text);
+        }
+
+        [Fact]
+        public void MemberSelector_Should_Set_DataContext()
+        {
+            var items = new[] { new Item("Foo"), new Item("Bar") };
+            var target = new ItemsPresenter
+            {
+                Items = items,
+                MemberSelector = new FuncMemberSelector<Item, string>(x => x.Value),
+            };
+
+            target.ApplyTemplate();
+
+            var dataContexts = target.Panel.Children
+                .Cast<ContentPresenter>()
+                .Do(x => x.UpdateChild())
+                .Select(x => x.DataContext)
+                .ToList();
+
+            Assert.Equal(new[] { "Foo", "Bar" }, dataContexts);
         }
 
         private class Item

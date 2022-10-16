@@ -1,21 +1,27 @@
-using System;
+using Android.Content;
+using Android.Runtime;
 using Android.Views;
+using Android.Views.InputMethods;
 using Avalonia.Android.Platform.Input;
-using Avalonia.Android.Platform.SkiaPlatform;
+using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Avalonia.Platform;
+using System;
+using System.ComponentModel;
 
 namespace Avalonia.Android.Platform.Specific.Helpers
 {
-    internal class AndroidKeyboardEventsHelper<TView> : IDisposable where TView : TopLevelImpl, IAndroidView
+    public class AndroidKeyboardEventsHelper<TView> : IDisposable where TView :ITopLevelImpl, IAndroidView
     {
-        private readonly TView _view;
+        private TView _view;
+        private IInputElement _lastFocusedElement;
 
         public bool HandleEvents { get; set; }
 
         public AndroidKeyboardEventsHelper(TView view)
         {
-            _view = view;
+            this._view = view;
             HandleEvents = true;
         }
 
@@ -30,20 +36,9 @@ namespace Avalonia.Android.Platform.Specific.Helpers
             return DispatchKeyEventInternal(e, out callBase);
         }
 
-        string UnicodeTextInput(KeyEvent keyEvent)
-        {
-            return keyEvent.Action == KeyEventActions.Multiple
-                && keyEvent.RepeatCount == 0
-                && !string.IsNullOrEmpty(keyEvent?.Characters)
-                ? keyEvent.Characters
-                : null;
-        }
-
         private bool? DispatchKeyEventInternal(KeyEvent e, out bool callBase)
         {
-            var unicodeTextInput = UnicodeTextInput(e);
-
-            if (e.Action == KeyEventActions.Multiple && unicodeTextInput == null)
+            if (e.Action == KeyEventActions.Multiple)
             {
                 callBase = true;
                 return null;
@@ -51,21 +46,17 @@ namespace Avalonia.Android.Platform.Specific.Helpers
 
             var rawKeyEvent = new RawKeyEventArgs(
                           AndroidKeyboardDevice.Instance,
-                          Convert.ToUInt64(e.EventTime),
-                          _view.InputRoot,
+                          Convert.ToUInt32(e.EventTime),
                           e.Action == KeyEventActions.Down ? RawKeyEventType.KeyDown : RawKeyEventType.KeyUp,
-                          AndroidKeyboardDevice.ConvertKey(e.KeyCode), GetModifierKeys(e));
-
+            AndroidKeyboardDevice.ConvertKey(e.KeyCode), GetModifierKeys(e));
             _view.Input(rawKeyEvent);
 
-            if ((e.Action == KeyEventActions.Down && e.UnicodeChar >= 32)
-                || unicodeTextInput != null)
+            if (e.Action == KeyEventActions.Down && e.UnicodeChar >= 32)
             {
                 var rawTextEvent = new RawTextInputEventArgs(
                   AndroidKeyboardDevice.Instance,
                   Convert.ToUInt32(e.EventTime),
-                  _view.InputRoot,
-                  unicodeTextInput ?? Convert.ToChar(e.UnicodeChar).ToString()
+                  Convert.ToChar(e.UnicodeChar).ToString()
                   );
                 _view.Input(rawTextEvent);
             }
@@ -81,14 +72,69 @@ namespace Avalonia.Android.Platform.Specific.Helpers
             return false;
         }
 
-        private static RawInputModifiers GetModifierKeys(KeyEvent e)
+        private static InputModifiers GetModifierKeys(KeyEvent e)
         {
-            var rv = RawInputModifiers.None;
+            var rv = InputModifiers.None;
 
-            if (e.IsCtrlPressed) rv |= RawInputModifiers.Control;
-            if (e.IsShiftPressed) rv |= RawInputModifiers.Shift;
+            if (e.IsCtrlPressed) rv |= InputModifiers.Control;
+            if (e.IsShiftPressed) rv |= InputModifiers.Shift;
 
             return rv;
+        }
+
+        private bool NeedsKeyboard(IInputElement element)
+        {
+            //may be some other elements
+            return element is TextBox;
+        }
+
+        private void TryShowHideKeyboard(IInputElement element, bool value)
+        {
+            var input = _view.View.Context.GetSystemService(Context.InputMethodService).JavaCast<InputMethodManager>();
+
+            if (value)
+            {
+                //show keyboard
+                //may be in the future different keyboards support e.g. normal, only digits etc.
+                //Android.Text.InputTypes
+                input.ToggleSoftInput(ShowFlags.Forced, HideSoftInputFlags.ImplicitOnly);
+            }
+            else
+            {
+                //hide keyboard
+                input.HideSoftInputFromWindow(_view.View.WindowToken, HideSoftInputFlags.None);
+            }
+        }
+
+        public void UpdateKeyboardState(IInputElement element)
+        {
+            var focusedElement = element;
+            bool oldValue = NeedsKeyboard(_lastFocusedElement);
+            bool newValue = NeedsKeyboard(focusedElement);
+
+            if (newValue != oldValue || newValue)
+            {
+                TryShowHideKeyboard(focusedElement, newValue);
+            }
+
+            _lastFocusedElement = element;
+        }
+
+        public void ActivateAutoShowKeybord()
+        {
+            var kbDevice = (KeyboardDevice.Instance as INotifyPropertyChanged);
+
+            //just in case we've called more than once the method
+            kbDevice.PropertyChanged -= KeyboardDevice_PropertyChanged;
+            kbDevice.PropertyChanged += KeyboardDevice_PropertyChanged;
+        }
+
+        private void KeyboardDevice_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(KeyboardDevice.FocusedElement))
+            {
+                UpdateKeyboardState(KeyboardDevice.Instance.FocusedElement);
+            }
         }
 
         public void Dispose()

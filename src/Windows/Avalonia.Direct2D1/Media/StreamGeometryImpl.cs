@@ -1,4 +1,6 @@
-using Avalonia.Metadata;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Platform;
 using SharpDX.Direct2D1;
 
@@ -7,7 +9,6 @@ namespace Avalonia.Direct2D1.Media
     /// <summary>
     /// A Direct2D implementation of a <see cref="Avalonia.Media.StreamGeometry"/>.
     /// </summary>
-    [Unstable]
     public class StreamGeometryImpl : GeometryImpl, IStreamGeometryImpl
     {
         /// <summary>
@@ -30,13 +31,11 @@ namespace Avalonia.Direct2D1.Media
         /// <inheritdoc/>
         public IStreamGeometryImpl Clone()
         {
-            var result = new PathGeometry(Direct2D1Platform.Direct2D1Factory);
-            using (var sink = result.Open())
-            {
-                ((PathGeometry)Geometry).Stream(sink);
-                sink.Close();
-            }
-
+            Factory factory = AvaloniaLocator.Current.GetService<Factory>();
+            var result = new PathGeometry(factory);
+            var sink = result.Open();
+            ((PathGeometry)Geometry).Stream(sink);
+            sink.Close();
             return new StreamGeometryImpl(result);
         }
 
@@ -48,7 +47,8 @@ namespace Avalonia.Direct2D1.Media
 
         private static Geometry CreateGeometry()
         {
-            return new PathGeometry(Direct2D1Platform.Direct2D1Factory);
+            Factory factory = AvaloniaLocator.Current.GetService<Factory>();
+            return new PathGeometry(factory);
         }
     }
 }

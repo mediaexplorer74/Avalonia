@@ -1,47 +1,60 @@
-// This source file is adapted from the Windows Presentation Foundation project. 
-// (https://github.com/dotnet/wpf/) 
-// 
-// Licensed to The Avalonia Project under MIT License, courtesy of The .NET Foundation.
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
 
 using System;
 using Avalonia.Input;
-using Avalonia.Layout;
 
 namespace Avalonia.Controls
 {
+    /// <summary>
+    /// Defines vertical or horizontal orientation.
+    /// </summary>
+    public enum Orientation
+    {
+        /// <summary>
+        /// Vertical orientation.
+        /// </summary>
+        Vertical,
+
+        /// <summary>
+        /// Horizontal orientation.
+        /// </summary>
+        Horizontal,
+    }
+
     /// <summary>
     /// A panel which lays out its children horizontally or vertically.
     /// </summary>
     public class StackPanel : Panel, INavigableContainer
     {
         /// <summary>
-        /// Defines the <see cref="Spacing"/> property.
+        /// Defines the <see cref="Gap"/> property.
         /// </summary>
-        public static readonly StyledProperty<double> SpacingProperty =
-            StackLayout.SpacingProperty.AddOwner<StackPanel>();
+        public static readonly StyledProperty<double> GapProperty =
+            AvaloniaProperty.Register<StackPanel, double>(nameof(Gap));
 
         /// <summary>
         /// Defines the <see cref="Orientation"/> property.
         /// </summary>
         public static readonly StyledProperty<Orientation> OrientationProperty =
-            StackLayout.OrientationProperty.AddOwner<StackPanel>();
+            AvaloniaProperty.Register<StackPanel, Orientation>(nameof(Orientation));
 
         /// <summary>
         /// Initializes static members of the <see cref="StackPanel"/> class.
         /// </summary>
         static StackPanel()
         {
-            AffectsMeasure<StackPanel>(SpacingProperty);
-            AffectsMeasure<StackPanel>(OrientationProperty);
+            AffectsMeasure(GapProperty);
+            AffectsMeasure(OrientationProperty);
         }
 
         /// <summary>
-        /// Gets or sets the size of the spacing to place between child controls.
+        /// Gets or sets the size of the gap to place between child controls.
         /// </summary>
-        public double Spacing
+        public double Gap
         {
-            get { return GetValue(SpacingProperty); }
-            set { SetValue(SpacingProperty, value); }
+            get { return GetValue(GapProperty); }
+            set { SetValue(GapProperty, value); }
         }
 
         /// <summary>
@@ -58,49 +71,11 @@ namespace Avalonia.Controls
         /// </summary>
         /// <param name="direction">The movement direction.</param>
         /// <param name="from">The control from which movement begins.</param>
-        /// <param name="wrap">Whether to wrap around when the first or last item is reached.</param>
         /// <returns>The control.</returns>
-        IInputElement? INavigableContainer.GetControl(NavigationDirection direction, IInputElement? from, bool wrap)
+        IInputElement INavigableContainer.GetControl(NavigationDirection direction, IInputElement from)
         {
-            var result = GetControlInDirection(direction, from as IControl);
-
-            if (result == null && wrap)
-            {
-                if (Orientation == Orientation.Vertical)
-                {
-                    switch (direction)
-                    {
-                        case NavigationDirection.Up:
-                        case NavigationDirection.Previous:
-                        case NavigationDirection.PageUp:
-                            result = GetControlInDirection(NavigationDirection.Last, null);
-                            break;
-                        case NavigationDirection.Down:
-                        case NavigationDirection.Next:
-                        case NavigationDirection.PageDown:
-                            result = GetControlInDirection(NavigationDirection.First, null);
-                            break;
-                    }
-                }
-                else
-                {
-                    switch (direction)
-                    {
-                        case NavigationDirection.Left:
-                        case NavigationDirection.Previous:
-                        case NavigationDirection.PageUp:
-                            result = GetControlInDirection(NavigationDirection.Last, null);
-                            break;
-                        case NavigationDirection.Right:
-                        case NavigationDirection.Next:
-                        case NavigationDirection.PageDown:
-                            result = GetControlInDirection(NavigationDirection.First, null);
-                            break;
-                    }
-                }
-            }
-
-            return result;
+            var fromControl = from as IControl;
+            return (fromControl != null) ? GetControlInDirection(direction, fromControl) : null;
         }
 
         /// <summary>
@@ -109,10 +84,10 @@ namespace Avalonia.Controls
         /// <param name="direction">The movement direction.</param>
         /// <param name="from">The control from which movement begins.</param>
         /// <returns>The control.</returns>
-        protected virtual IInputElement? GetControlInDirection(NavigationDirection direction, IControl? from)
+        protected virtual IInputElement GetControlInDirection(NavigationDirection direction, IControl from)
         {
             var horiz = Orientation == Orientation.Horizontal;
-            int index = from != null ? Children.IndexOf(from) : -1;
+            int index = Children.IndexOf((IControl)from);
 
             switch (direction)
             {
@@ -126,19 +101,19 @@ namespace Avalonia.Controls
                     ++index;
                     break;
                 case NavigationDirection.Previous:
-                    if (index != -1) --index;
+                    --index;
                     break;
                 case NavigationDirection.Left:
-                    if (index != -1) index = horiz ? index - 1 : -1;
+                    index = horiz ? index - 1 : -1;
                     break;
                 case NavigationDirection.Right:
-                    if (index != -1) index = horiz ? index + 1 : -1;
+                    index = horiz ? index + 1 : -1;
                     break;
                 case NavigationDirection.Up:
-                    if (index != -1) index = horiz ? -1 : index - 1;
+                    index = horiz ? -1 : index - 1;
                     break;
                 case NavigationDirection.Down:
-                    if (index != -1) index = horiz ? -1 : index + 1;
+                    index = horiz ? -1 : index + 1;
                     break;
                 default:
                     index = -1;
@@ -156,125 +131,118 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// General StackPanel layout behavior is to grow unbounded in the "stacking" direction (Size To Content).
-        /// Children in this dimension are encouraged to be as large as they like.  In the other dimension,
-        /// StackPanel will assume the maximum size of its children.
+        /// Measures the control.
         /// </summary>
-        /// <param name="availableSize">Constraint</param>
-        /// <returns>Desired size</returns>
+        /// <param name="availableSize">The available size.</param>
+        /// <returns>The desired size of the control.</returns>
         protected override Size MeasureOverride(Size availableSize)
         {
-            Size stackDesiredSize = new Size();
-            var children = Children;
-            Size layoutSlotSize = availableSize;
-            bool fHorizontal = (Orientation == Orientation.Horizontal);
-            double spacing = Spacing;
-            bool hasVisibleChild = false;
+            double childAvailableWidth = double.PositiveInfinity;
+            double childAvailableHeight = double.PositiveInfinity;
 
-            //
-            // Initialize child sizing and iterator data
-            // Allow children as much size as they want along the stack.
-            //
-            if (fHorizontal)
+            if (Orientation == Orientation.Vertical)
             {
-                layoutSlotSize = layoutSlotSize.WithWidth(Double.PositiveInfinity);
+                childAvailableWidth = availableSize.Width;
+
+                if (!double.IsNaN(Width))
+                {
+                    childAvailableWidth = Width;
+                }
+
+                childAvailableWidth = Math.Min(childAvailableWidth, MaxWidth);
+                childAvailableWidth = Math.Max(childAvailableWidth, MinWidth);
             }
             else
             {
-                layoutSlotSize = layoutSlotSize.WithHeight(Double.PositiveInfinity);
-            }
+                childAvailableHeight = availableSize.Height;
 
-            //
-            //  Iterate through children.
-            //  While we still supported virtualization, this was hidden in a child iterator (see source history).
-            //
-            for (int i = 0, count = children.Count; i < count; ++i)
-            {
-                // Get next child.
-                var child = children[i];
-
-                if (child == null)
-                { continue; }
-
-                bool isVisible = child.IsVisible;
-
-                if (isVisible && !hasVisibleChild)
+                if (!double.IsNaN(Height))
                 {
-                    hasVisibleChild = true;
+                    childAvailableHeight = Height;
                 }
 
-                // Measure the child.
-                child.Measure(layoutSlotSize);
-                Size childDesiredSize = child.DesiredSize;
+                childAvailableHeight = Math.Min(childAvailableHeight, MaxHeight);
+                childAvailableHeight = Math.Max(childAvailableHeight, MinHeight);
+            }
 
-                // Accumulate child size.
-                if (fHorizontal)
+            double measuredWidth = 0;
+            double measuredHeight = 0;
+            double gap = Gap;
+
+            foreach (Control child in Children)
+            {
+                child.Measure(new Size(childAvailableWidth, childAvailableHeight));
+                Size size = child.DesiredSize;
+
+                if (Orientation == Orientation.Vertical)
                 {
-                    stackDesiredSize = stackDesiredSize.WithWidth(stackDesiredSize.Width + (isVisible ? spacing : 0) + childDesiredSize.Width);
-                    stackDesiredSize = stackDesiredSize.WithHeight(Math.Max(stackDesiredSize.Height, childDesiredSize.Height));
+                    measuredHeight += size.Height + gap;
+                    measuredWidth = Math.Max(measuredWidth, size.Width);
                 }
                 else
                 {
-                    stackDesiredSize = stackDesiredSize.WithWidth(Math.Max(stackDesiredSize.Width, childDesiredSize.Width));
-                    stackDesiredSize = stackDesiredSize.WithHeight(stackDesiredSize.Height + (isVisible ? spacing : 0) + childDesiredSize.Height);
+                    measuredWidth += size.Width + gap;
+                    measuredHeight = Math.Max(measuredHeight, size.Height);
                 }
             }
 
-            if (fHorizontal)
-            {
-                stackDesiredSize = stackDesiredSize.WithWidth(stackDesiredSize.Width - (hasVisibleChild ? spacing : 0));
-            }
-            else
-            { 
-                stackDesiredSize = stackDesiredSize.WithHeight(stackDesiredSize.Height - (hasVisibleChild ? spacing : 0));
-            }
-
-            return stackDesiredSize;
+            return new Size(measuredWidth, measuredHeight);
         }
 
         /// <summary>
-        /// Content arrangement.
+        /// Arranges the control's children.
         /// </summary>
-        /// <param name="finalSize">Arrange size</param>
+        /// <param name="finalSize">The size allocated to the control.</param>
+        /// <returns>The space taken.</returns>
         protected override Size ArrangeOverride(Size finalSize)
         {
-            var children = Children;
-            bool fHorizontal = (Orientation == Orientation.Horizontal);
-            Rect rcChild = new Rect(finalSize);
-            double previousChildSize = 0.0;
-            var spacing = Spacing;
+            var orientation = Orientation;
+            double arrangedWidth = finalSize.Width;
+            double arrangedHeight = finalSize.Height;
+            double gap = Gap;
 
-            //
-            // Arrange and Position Children.
-            //
-            for (int i = 0, count = children.Count; i < count; ++i)
+            if (Orientation == Orientation.Vertical)
             {
-                var child = children[i];
+                arrangedHeight = 0;
+            }
+            else
+            {
+                arrangedWidth = 0;
+            }
 
-                if (child == null || !child.IsVisible)
-                { continue; }
+            foreach (Control child in Children)
+            {
+                double childWidth = child.DesiredSize.Width;
+                double childHeight = child.DesiredSize.Height;
 
-                if (fHorizontal)
+                if (orientation == Orientation.Vertical)
                 {
-                    rcChild = rcChild.WithX(rcChild.X + previousChildSize);
-                    previousChildSize = child.DesiredSize.Width;
-                    rcChild = rcChild.WithWidth(previousChildSize);
-                    rcChild = rcChild.WithHeight(Math.Max(finalSize.Height, child.DesiredSize.Height));
-                    previousChildSize += spacing;
+                    double width = Math.Max(childWidth, arrangedWidth);
+                    Rect childFinal = new Rect(0, arrangedHeight, width, childHeight);
+                    ArrangeChild(child, childFinal, finalSize, orientation);
+                    arrangedWidth = Math.Max(arrangedWidth, childWidth);
+                    arrangedHeight += childHeight + gap;
                 }
                 else
                 {
-                    rcChild = rcChild.WithY(rcChild.Y + previousChildSize);
-                    previousChildSize = child.DesiredSize.Height;
-                    rcChild = rcChild.WithHeight(previousChildSize);
-                    rcChild = rcChild.WithWidth(Math.Max(finalSize.Width, child.DesiredSize.Width));
-                    previousChildSize += spacing;
+                    double height = Math.Max(childHeight, arrangedHeight);
+                    Rect childFinal = new Rect(arrangedWidth, 0, childWidth, height);
+                    ArrangeChild(child, childFinal, finalSize, orientation);
+                    arrangedWidth += childWidth + gap;
+                    arrangedHeight = Math.Max(arrangedHeight, childHeight);
                 }
-
-                ArrangeChild(child, rcChild, finalSize, Orientation);
             }
 
-            return finalSize;
+            if (orientation == Orientation.Vertical)
+            {
+                arrangedHeight = Math.Max(arrangedHeight - gap, finalSize.Height);
+            }
+            else
+            {
+                arrangedWidth = Math.Max(arrangedWidth - gap, finalSize.Width);
+            }
+
+            return new Size(arrangedWidth, arrangedHeight);
         }
 
         internal virtual void ArrangeChild(

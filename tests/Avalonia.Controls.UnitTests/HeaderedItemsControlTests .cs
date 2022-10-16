@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
@@ -34,7 +37,7 @@ namespace Avalonia.Controls.UnitTests
 
             target.Header = "Foo";
             target.ApplyTemplate();
-            ((ContentPresenter)target.HeaderPresenter).UpdateChild();
+            target.HeaderPresenter.UpdateChild();
 
             var child = target.HeaderPresenter.Child;
 
@@ -60,7 +63,7 @@ namespace Avalonia.Controls.UnitTests
 
         private FuncControlTemplate GetTemplate()
         {
-            return new FuncControlTemplate<HeaderedItemsControl>((parent, scope) =>
+            return new FuncControlTemplate<HeaderedItemsControl>(parent =>
             {
                 return new Border
                 {
@@ -68,7 +71,7 @@ namespace Avalonia.Controls.UnitTests
                     {
                         Name = "PART_HeaderPresenter",
                         [~ContentPresenter.ContentProperty] = parent[~HeaderedItemsControl.HeaderProperty],
-                    }.RegisterInNameScope(scope)
+                    }
                 };
             });
         }

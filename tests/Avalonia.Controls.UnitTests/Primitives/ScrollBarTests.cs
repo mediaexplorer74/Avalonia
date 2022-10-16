@@ -1,8 +1,10 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Linq;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
-using Avalonia.Input;
 using Avalonia.Media;
 using Xunit;
 
@@ -22,7 +24,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             var track = (Track)target.GetTemplateChildren().First(x => x.Name == "track");
             target.Value = 50;
 
-            Assert.Equal(50, track.Value);
+            Assert.Equal(track.Value, 50);
         }
 
         [Fact]
@@ -37,7 +39,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             var track = (Track)target.GetTemplateChildren().First(x => x.Name == "track");
             track.Value = 50;
 
-            Assert.Equal(50, target.Value);
+            Assert.Equal(target.Value, 50);
         }
 
         [Fact]
@@ -54,65 +56,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             target.Value = 25;
             track.Value = 50;
 
-            Assert.Equal(50, target.Value);
-        }
-
-        [Fact]
-        public void Thumb_DragDelta_Event_Should_Raise_Scroll_Event()
-        {
-            var target = new ScrollBar
-            {
-                Template = new FuncControlTemplate<ScrollBar>(Template),
-            };
-
-            target.ApplyTemplate();
-
-            var track = (Track)target.GetTemplateChildren().First(x => x.Name == "track");
-
-            var raisedEvent = Assert.Raises<ScrollEventArgs>(
-                handler => target.Scroll += handler,
-                handler => target.Scroll -= handler,
-                () =>
-                {
-                    var ev = new VectorEventArgs
-                    {
-                        RoutedEvent = Thumb.DragDeltaEvent,
-                        Vector = new Vector(0, 0)
-                    };
-
-                    track.Thumb.RaiseEvent(ev);
-                });
-
-            Assert.Equal(ScrollEventType.ThumbTrack, raisedEvent.Arguments.ScrollEventType);
-        }
-
-        [Fact]
-        public void Thumb_DragComplete_Event_Should_Raise_Scroll_Event()
-        {
-            var target = new ScrollBar
-            {
-                Template = new FuncControlTemplate<ScrollBar>(Template),
-            };
-
-            target.ApplyTemplate();
-
-            var track = (Track)target.GetTemplateChildren().First(x => x.Name == "track");
-
-            var raisedEvent = Assert.Raises<ScrollEventArgs>(
-                handler => target.Scroll += handler,
-                handler => target.Scroll -= handler,
-                () =>
-                {
-                    var ev = new VectorEventArgs
-                    {
-                        RoutedEvent = Thumb.DragCompletedEvent,
-                        Vector = new Vector(0, 0)
-                    };
-
-                    track.Thumb.RaiseEvent(ev);
-                });
-
-            Assert.Equal(ScrollEventType.EndScroll, raisedEvent.Arguments.ScrollEventType);
+            Assert.Equal(target.Value, 50);
         }
 
         [Fact]
@@ -121,8 +65,9 @@ namespace Avalonia.Controls.UnitTests.Primitives
             var target = new ScrollBar();
 
             target.Visibility = ScrollBarVisibility.Auto;
-            target.ViewportSize = 1;
-            target.Maximum = 0;
+            target.Minimum = 0;
+            target.Maximum = 100;
+            target.ViewportSize = 100;
 
             Assert.False(target.IsVisible);
         }
@@ -166,7 +111,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             Assert.False(target.IsVisible);
         }
 
-        private static Control Template(ScrollBar control, INameScope scope)
+        private static Control Template(ScrollBar control)
         {
             return new Border
             {
@@ -182,11 +127,11 @@ namespace Avalonia.Controls.UnitTests.Primitives
                     {
                         Template = new FuncControlTemplate<Thumb>(ThumbTemplate),
                     },
-                }.RegisterInNameScope(scope),
+                },
             };
         }
 
-        private static Control ThumbTemplate(Thumb control, INameScope scope)
+        private static Control ThumbTemplate(Thumb control)
         {
             return new Border
             {

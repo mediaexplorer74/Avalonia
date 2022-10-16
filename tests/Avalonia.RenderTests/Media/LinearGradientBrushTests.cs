@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls;
 using Avalonia.Media;
 using System;
@@ -7,7 +10,9 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-#if AVALONIA_SKIA
+#if AVALONIA_CAIRO
+namespace Avalonia.Cairo.RenderTests.Media
+#elif AVALONIA_SKIA
 namespace Avalonia.Skia.RenderTests
 #else
 namespace Avalonia.Direct2D1.RenderTests.Media
@@ -18,9 +23,13 @@ namespace Avalonia.Direct2D1.RenderTests.Media
         public LinearGradientBrushTests() : base(@"Media\LinearGradientBrush")
         {
         }
-        
+
+#if AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task LinearGradientBrush_RedBlue_Horizontal_Fill()
+#endif
+        public void LinearGradientBrush_RedBlue_Horizontal_Fill()
         {
             Decorator target = new Decorator
             {
@@ -33,7 +42,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                     {
                         StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative),
                         EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
-                        GradientStops =
+                        GradientStops = new[]
                         {
                             new GradientStop { Color = Colors.Red, Offset = 0 },
                             new GradientStop { Color = Colors.Blue, Offset = 1 }
@@ -42,12 +51,16 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
-        
+
+#if AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task LinearGradientBrush_RedBlue_Vertical_Fill()
+#endif
+        public void LinearGradientBrush_RedBlue_Vertical_Fill()
         {
             Decorator target = new Decorator
             {
@@ -60,7 +73,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                     {
                         StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
                         EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
-                        GradientStops =
+                        GradientStops = new[]
                         {
                             new GradientStop { Color = Colors.Red, Offset = 0 },
                             new GradientStop { Color = Colors.Blue, Offset = 1 }
@@ -69,46 +82,8 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
-        }
-
-        [Fact]
-        public async Task LinearGradientBrush_DrawingContext()
-        {
-            var brush = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops =
-                {
-                    new GradientStop { Color = Colors.Red, Offset = 0 },
-                    new GradientStop { Color = Colors.Blue, Offset = 1 }
-                }
-            };
-
-            Decorator target = new Decorator
-            {
-                Width = 200,
-                Height = 200,
-                Child = new DrawnControl(c =>
-                {
-                    c.DrawRectangle(brush, null, new Rect(0, 0, 100, 100));
-
-                    using (c.PushPreTransform(Matrix.CreateTranslation(100, 100)))
-                        c.DrawRectangle(brush, null, new Rect(0, 0, 100, 100));
-                }),
-            };
-
-            await RenderToFile(target);
-            CompareImages();
-        }
-
-        private class DrawnControl : Control
-        {
-            private readonly Action<DrawingContext> _render;
-            public DrawnControl(Action<DrawingContext> render) => _render = render;
-            public override void Render(DrawingContext context) => _render(context);
         }
     }
 }

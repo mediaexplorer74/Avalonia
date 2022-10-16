@@ -1,36 +1,37 @@
-using System;
-using Avalonia.Controls.Templates;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System.Collections.Generic;
+using OmniXaml;
+using OmniXaml.ObjectAssembler;
+using Avalonia.Controls;
+using Avalonia.Markup.Xaml.Context;
 
 namespace Avalonia.Markup.Xaml.Templates
 {
-    
-    public static class TemplateContent
+    public class TemplateContent
     {
-        public static ControlTemplateResult Load(object templateContent)
+        private readonly IEnumerable<Instruction> nodes;
+        private readonly IRuntimeTypeSource runtimeTypeSource;
 
+        public TemplateContent(IEnumerable<Instruction> nodes, IRuntimeTypeSource runtimeTypeSource)
         {
-            if (templateContent is Func<IServiceProvider, object> direct)
-            {
-                return (ControlTemplateResult)direct(null);
-            }
-
-            if (templateContent is null)
-            {
-                return null;
-            }
-
-            throw new ArgumentException(nameof(templateContent));
+            this.nodes = nodes;
+            this.runtimeTypeSource = runtimeTypeSource;
         }
 
-        public static TemplateResult<T> Load<T>(object templateContent)
+        public Control Load()
         {
-            if (templateContent is Func<IServiceProvider, object> direct)
-                return (TemplateResult<T>)direct(null);
+            var assembler = new AvaloniaObjectAssembler(
+                runtimeTypeSource,
+                new TopDownValueContext());
 
-            if (templateContent is null)
-                return null;
+            foreach (var xamlNode in nodes)
+            {
+                assembler.Process(xamlNode);
+            }
 
-            throw new ArgumentException(nameof(templateContent));
+            return (Control)assembler.Result;
         }
     }
 }

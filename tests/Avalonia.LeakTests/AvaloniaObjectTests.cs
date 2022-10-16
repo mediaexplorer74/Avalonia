@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Reactive.Subjects;
-using Avalonia.Threading;
 using JetBrains.dotMemoryUnit;
 using Xunit;
 using Xunit.Abstractions;
@@ -57,9 +56,7 @@ namespace Avalonia.LeakTests
 
             completeSource();
             GC.Collect();
-            // Forces WeakEvent compact
-            Dispatcher.UIThread.RunJobs();
-            GC.Collect();
+
             Assert.False(weakSource.IsAlive);
         }
 

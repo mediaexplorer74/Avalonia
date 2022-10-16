@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using Moq;
 using Avalonia.Input;
@@ -5,14 +8,12 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Platform;
+using Avalonia.Shared.PlatformSupport;
 using Avalonia.Styling;
-using Avalonia.Themes.Simple;
+using Avalonia.Themes.Default;
 using Avalonia.Rendering;
 using System.Reactive.Concurrency;
 using System.Collections.Generic;
-using Avalonia.Controls;
-using System.Reflection;
-using Avalonia.Animation;
 
 namespace Avalonia.UnitTests
 {
@@ -20,21 +21,19 @@ namespace Avalonia.UnitTests
     {
         public static readonly TestServices StyledWindow = new TestServices(
             assetLoader: new AssetLoader(),
+            layoutManager: new LayoutManager(),
             platform: new AppBuilder().RuntimePlatform,
-            renderInterface: new MockPlatformRenderInterface(),
-            standardCursorFactory: Mock.Of<ICursorFactory>(),
+            renderer: (_, __) => Mock.Of<IRenderer>(),
+            renderInterface: CreateRenderInterfaceMock(),
+            renderLoop: Mock.Of<IRenderLoop>(),
+            standardCursorFactory: Mock.Of<IStandardCursorFactory>(),
             styler: new Styler(),
-            theme: () => CreateSimpleTheme(),
+            theme: () => CreateDefaultTheme(),
             threadingInterface: Mock.Of<IPlatformThreadingInterface>(x => x.CurrentThreadIsLoopThread == true),
-            fontManagerImpl: new MockFontManagerImpl(),
-            textShaperImpl: new MockTextShaperImpl(),
             windowingPlatform: new MockWindowingPlatform());
 
         public static readonly TestServices MockPlatformRenderInterface = new TestServices(
-            assetLoader: new AssetLoader(),
-            renderInterface: new MockPlatformRenderInterface(),
-            fontManagerImpl: new MockFontManagerImpl(),
-            textShaperImpl: new MockTextShaperImpl());
+            renderInterface: CreateRenderInterfaceMock());
 
         public static readonly TestServices MockPlatformWrapper = new TestServices(
             platform: Mock.Of<IRuntimePlatform>());
@@ -51,146 +50,127 @@ namespace Avalonia.UnitTests
         public static readonly TestServices RealFocus = new TestServices(
             focusManager: new FocusManager(),
             keyboardDevice: () => new KeyboardDevice(),
-            keyboardNavigation: new KeyboardNavigationHandler(),
-            inputManager: new InputManager(),
-            assetLoader: new AssetLoader(),
-            renderInterface: new MockPlatformRenderInterface(),
-            fontManagerImpl: new MockFontManagerImpl(),
-            textShaperImpl: new MockTextShaperImpl());
+            inputManager: new InputManager());
+
+        public static readonly TestServices RealLayoutManager = new TestServices(
+            layoutManager: new LayoutManager());
 
         public static readonly TestServices RealStyler = new TestServices(
             styler: new Styler());
 
-        public static readonly TestServices TextServices = new TestServices(
-            assetLoader: new AssetLoader(),
-            renderInterface: new MockPlatformRenderInterface(),
-            fontManagerImpl: new HarfBuzzFontManagerImpl(),
-            textShaperImpl: new HarfBuzzTextShaperImpl());
-        
         public TestServices(
             IAssetLoader assetLoader = null,
             IFocusManager focusManager = null,
-            IGlobalClock globalClock = null,
             IInputManager inputManager = null,
             Func<IKeyboardDevice> keyboardDevice = null,
-            IKeyboardNavigationHandler keyboardNavigation = null,
-            Func<IMouseDevice> mouseDevice = null,
+            ILayoutManager layoutManager = null,
             IRuntimePlatform platform = null,
+            Func<IRenderRoot, IRenderLoop, IRenderer> renderer = null,
             IPlatformRenderInterface renderInterface = null,
-            IRenderTimer renderLoop = null,
+            IRenderLoop renderLoop = null,
             IScheduler scheduler = null,
-            ICursorFactory standardCursorFactory = null,
+            IStandardCursorFactory standardCursorFactory = null,
             IStyler styler = null,
-            Func<IStyle> theme = null,
+            Func<Styles> theme = null,
             IPlatformThreadingInterface threadingInterface = null,
-            IFontManagerImpl fontManagerImpl = null,
-            ITextShaperImpl textShaperImpl = null,
-            IWindowImpl windowImpl = null,
             IWindowingPlatform windowingPlatform = null)
         {
             AssetLoader = assetLoader;
             FocusManager = focusManager;
-            GlobalClock = globalClock;
             InputManager = inputManager;
             KeyboardDevice = keyboardDevice;
-            KeyboardNavigation = keyboardNavigation;
-            MouseDevice = mouseDevice;
+            LayoutManager = layoutManager;
             Platform = platform;
+            Renderer = renderer;
             RenderInterface = renderInterface;
-            FontManagerImpl = fontManagerImpl;
-            TextShaperImpl = textShaperImpl;
+            RenderLoop = renderLoop;
             Scheduler = scheduler;
             StandardCursorFactory = standardCursorFactory;
             Styler = styler;
             Theme = theme;
             ThreadingInterface = threadingInterface;
-            WindowImpl = windowImpl;
             WindowingPlatform = windowingPlatform;
         }
 
         public IAssetLoader AssetLoader { get; }
         public IInputManager InputManager { get; }
         public IFocusManager FocusManager { get; }
-        public IGlobalClock GlobalClock { get; }
         public Func<IKeyboardDevice> KeyboardDevice { get; }
-        public IKeyboardNavigationHandler KeyboardNavigation { get; }
-        public Func<IMouseDevice> MouseDevice { get; }
+        public ILayoutManager LayoutManager { get; }
         public IRuntimePlatform Platform { get; }
+        public Func<IRenderRoot, IRenderLoop, IRenderer> Renderer { get; }
         public IPlatformRenderInterface RenderInterface { get; }
-        public IFontManagerImpl FontManagerImpl { get; }
-        public ITextShaperImpl TextShaperImpl { get; }
+        public IRenderLoop RenderLoop { get; }
         public IScheduler Scheduler { get; }
-        public ICursorFactory StandardCursorFactory { get; }
+        public IStandardCursorFactory StandardCursorFactory { get; }
         public IStyler Styler { get; }
-        public Func<IStyle> Theme { get; }
+        public Func<Styles> Theme { get; }
         public IPlatformThreadingInterface ThreadingInterface { get; }
-        public IWindowImpl WindowImpl { get; }
         public IWindowingPlatform WindowingPlatform { get; }
 
         public TestServices With(
             IAssetLoader assetLoader = null,
             IFocusManager focusManager = null,
-            IGlobalClock globalClock = null,
             IInputManager inputManager = null,
             Func<IKeyboardDevice> keyboardDevice = null,
-            IKeyboardNavigationHandler keyboardNavigation = null,
-            Func<IMouseDevice> mouseDevice = null,
+            ILayoutManager layoutManager = null,
             IRuntimePlatform platform = null,
+            Func<IRenderRoot, IRenderLoop, IRenderer> renderer = null,
             IPlatformRenderInterface renderInterface = null,
-            IRenderTimer renderLoop = null,
+            IRenderLoop renderLoop = null,
             IScheduler scheduler = null,
-            ICursorFactory standardCursorFactory = null,
+            IStandardCursorFactory standardCursorFactory = null,
             IStyler styler = null,
             Func<Styles> theme = null,
             IPlatformThreadingInterface threadingInterface = null,
-            IFontManagerImpl fontManagerImpl = null,
-            ITextShaperImpl textShaperImpl = null,
             IWindowImpl windowImpl = null,
             IWindowingPlatform windowingPlatform = null)
         {
             return new TestServices(
                 assetLoader: assetLoader ?? AssetLoader,
                 focusManager: focusManager ?? FocusManager,
-                globalClock: globalClock ?? GlobalClock,
                 inputManager: inputManager ?? InputManager,
                 keyboardDevice: keyboardDevice ?? KeyboardDevice,
-                keyboardNavigation: keyboardNavigation ?? KeyboardNavigation,
-                mouseDevice: mouseDevice ?? MouseDevice,
+                layoutManager: layoutManager ?? LayoutManager,
                 platform: platform ?? Platform,
+                renderer: renderer ?? Renderer,
                 renderInterface: renderInterface ?? RenderInterface,
-                fontManagerImpl: fontManagerImpl ?? FontManagerImpl,
-                textShaperImpl: textShaperImpl ?? TextShaperImpl,
+                renderLoop: renderLoop ?? RenderLoop,
                 scheduler: scheduler ?? Scheduler,
                 standardCursorFactory: standardCursorFactory ?? StandardCursorFactory,
                 styler: styler ?? Styler,
                 theme: theme ?? Theme,
                 threadingInterface: threadingInterface ?? ThreadingInterface,
-                windowingPlatform: windowingPlatform ?? WindowingPlatform,
-                windowImpl: windowImpl ?? WindowImpl);
+                windowingPlatform: windowingPlatform ?? WindowingPlatform);
         }
 
-        private static IStyle CreateSimpleTheme()
+        private static Styles CreateDefaultTheme()
         {
-            return new SimpleTheme { Mode = SimpleThemeMode.Light };
+            var result = new Styles
+            {
+                new DefaultTheme(),
+            };
+
+            var loader = new AvaloniaXamlLoader();
+            var baseLight = (IStyle)loader.Load(
+                new Uri("resm:Avalonia.Themes.Default.Accents.BaseLight.xaml?assembly=Avalonia.Themes.Default"));
+            result.Add(baseLight);
+
+            return result;
         }
 
         private static IPlatformRenderInterface CreateRenderInterfaceMock()
         {
-            return Mock.Of<IPlatformRenderInterface>(x =>
+            return Mock.Of<IPlatformRenderInterface>(x => 
+                x.CreateFormattedText(
+                    It.IsAny<string>(),
+                    It.IsAny<Typeface>(),
+                    It.IsAny<TextAlignment>(),
+                    It.IsAny<TextWrapping>(),
+                    It.IsAny<Size>(),
+                    It.IsAny<IReadOnlyList<FormattedTextStyleSpan>>()) == Mock.Of<IFormattedTextImpl>() &&
                 x.CreateStreamGeometry() == Mock.Of<IStreamGeometryImpl>(
                     y => y.Open() == Mock.Of<IStreamGeometryContextImpl>()));
         }
-    }
-
-    public class AppBuilder : AppBuilderBase<AppBuilder>
-    {
-        public AppBuilder()
-            : base(new StandardRuntimePlatform(),
-                  builder => StandardRuntimePlatformServices.Register(builder.Instance?.GetType()
-                      ?.GetTypeInfo().Assembly))
-        {
-        }
-
-        protected override bool CheckSetup => false;
     }
 }

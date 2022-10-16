@@ -1,80 +1,81 @@
 ﻿using System;
-
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Direct2D1;
 using Avalonia.Direct2D1.Media;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Rendering;
-
 using SharpDX;
 using SharpDX.D3DCompiler;
 using SharpDX.Direct2D1;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
-
+using SharpDX.WIC;
+using SharpDX.Mathematics;
 using AlphaMode = SharpDX.Direct2D1.AlphaMode;
 using Buffer = SharpDX.Direct3D11.Buffer;
-using DeviceContext = SharpDX.Direct2D1.DeviceContext;
-using Factory2 = SharpDX.DXGI.Factory2;
+using DeviceContext = SharpDX.Direct3D11.DeviceContext;
+using Factory1 = SharpDX.DXGI.Factory1;
 using InputElement = SharpDX.Direct3D11.InputElement;
 using Matrix = SharpDX.Matrix;
 using PixelFormat = SharpDX.Direct2D1.PixelFormat;
-using Resource = SharpDX.Direct3D11.Resource;
 
 namespace Direct3DInteropSample
 {
-    public class MainWindow : Window
+    class MainWindow : Window
     {
-        Texture2D _backBuffer;
-        RenderTargetView _renderView;
-        Texture2D _depthBuffer;
-        DepthStencilView _depthView;
+        private SharpDX.Direct3D11.Device _d3dDevice;
+        private SharpDX.DXGI.Device _dxgiDevice;
+        Texture2D backBuffer = null;
+        RenderTargetView renderView = null;
+        Texture2D depthBuffer = null;
+        DepthStencilView depthView = null;
         private readonly SwapChain _swapChain;
-        private SwapChainDescription1 _desc;
+        private SwapChainDescription _desc;
         private Matrix _proj = Matrix.Identity;
-        private readonly Matrix _view;
+        private Matrix _view;
         private Buffer _contantBuffer;
-        private DeviceContext _deviceContext;
-        private readonly MainWindowViewModel _model;
+        private SharpDX.Direct2D1.Device _d2dDevice;
+        private SharpDX.Direct2D1.DeviceContext _d2dContext;
+        private RenderTarget _d2dRenderTarget;
+        private MainWindowViewModel _model;
 
         public MainWindow()
         {
+            _dxgiDevice = AvaloniaLocator.Current.GetService<SharpDX.DXGI.Device>();
+            _d3dDevice = _dxgiDevice.QueryInterface<SharpDX.Direct3D11.Device>();
+            _d2dDevice = AvaloniaLocator.Current.GetService<SharpDX.Direct2D1.Device>();
             DataContext = _model = new MainWindowViewModel();
-
-            _desc = new SwapChainDescription1()
+            _desc = new SwapChainDescription()
             {
                 BufferCount = 1,
-                Width = (int)ClientSize.Width,
-                Height = (int)ClientSize.Height,
-                Format = Format.R8G8B8A8_UNorm,                
+                ModeDescription =
+                   new ModeDescription((int)ClientSize.Width, (int)ClientSize.Height,
+                            new Rational(60, 1), Format.R8G8B8A8_UNorm),
+                IsWindowed = true,
+                OutputHandle = PlatformImpl?.Handle.Handle ?? IntPtr.Zero,
                 SampleDescription = new SampleDescription(1, 0),
                 SwapEffect = SwapEffect.Discard,
                 Usage = Usage.RenderTargetOutput
             };
 
-            using (var factory = Direct2D1Platform.DxgiDevice.Adapter.GetParent<Factory2>())
-            {
-                _swapChain = new SwapChain1(factory, Direct2D1Platform.DxgiDevice, PlatformImpl?.Handle.Handle ?? IntPtr.Zero, ref _desc);
-            }              
+            _swapChain = new SwapChain(new Factory1(), _d3dDevice, _desc);
 
-            _deviceContext = new DeviceContext(Direct2D1Platform.Direct2D1Device, DeviceContextOptions.None)
+            _d2dContext = new SharpDX.Direct2D1.DeviceContext(_d2dDevice, DeviceContextOptions.None)
             {
                 DotsPerInch = new Size2F(96, 96)
             };
 
             CreateMesh();
-
             _view = Matrix.LookAtLH(new Vector3(0, 0, -5), new Vector3(0, 0, 0), Vector3.UnitY);
-
             this.GetObservable(ClientSizeProperty).Subscribe(Resize);
-
             Resize(ClientSize);
-
             AvaloniaXamlLoader.Load(this);
-
             Background = Avalonia.Media.Brushes.Transparent;
         }
 
@@ -82,32 +83,30 @@ namespace Direct3DInteropSample
         protected override void HandlePaint(Rect rect)
         {
             var viewProj = Matrix.Multiply(_view, _proj);
-            var context = Direct2D1Platform.Direct3D11Device.ImmediateContext;
-
+            var context = _d3dDevice.ImmediateContext;
             // Clear views
-            context.ClearDepthStencilView(_depthView, DepthStencilClearFlags.Depth, 1.0f, 0);
-            context.ClearRenderTargetView(_renderView, Color.White);
+            context.ClearDepthStencilView(depthView, DepthStencilClearFlags.Depth, 1.0f, 0);
+            context.ClearRenderTargetView(renderView, Color.White);
 
+            var time = 50;
             // Update WorldViewProj Matrix
-            var worldViewProj = Matrix.RotationX((float)_model.RotationX) * Matrix.RotationY((float)_model.RotationY)
-                                                                          * Matrix.RotationZ((float)_model.RotationZ)
-                                                                          * Matrix.Scaling((float)_model.Zoom)
-                                                                          * viewProj;
+            var worldViewProj = Matrix.RotationX((float) _model.RotationX) * Matrix.RotationY((float) _model.RotationY) *
+                                Matrix.RotationZ((float) _model.RotationZ)
+                                * Matrix.Scaling((float) _model.Zoom) * viewProj;
             worldViewProj.Transpose();
             context.UpdateSubresource(ref worldViewProj, _contantBuffer);
 
             // Draw the cube
             context.Draw(36, 0);
             base.HandlePaint(rect);
-
             // Present!
             _swapChain.Present(0, PresentFlags.None);
         }
 
-        private void CreateMesh()
+        
+        void CreateMesh()
         {
-            var device = Direct2D1Platform.Direct3D11Device;
-
+            var device = _d3dDevice;
             // Compile Vertex and Pixel shaders
             var vertexShaderByteCode = ShaderBytecode.CompileFromFile("MiniCube.fx", "VS", "vs_4_0");
             var vertexShader = new VertexShader(device, vertexShaderByteCode);
@@ -116,72 +115,63 @@ namespace Direct3DInteropSample
             var pixelShader = new PixelShader(device, pixelShaderByteCode);
 
             var signature = ShaderSignature.GetInputSignature(vertexShaderByteCode);
-
-            var inputElements = new[]
-                                {
-                                    new InputElement("POSITION", 0, Format.R32G32B32A32_Float, 0, 0),
-                                    new InputElement("COLOR", 0, Format.R32G32B32A32_Float, 16, 0)
-                                };
-
             // Layout from VertexShader input signature
-            var layout = new InputLayout(
-                device,
-                signature,
-                inputElements);
+            var layout = new InputLayout(device, signature, new[]
+                    {
+                        new InputElement("POSITION", 0, Format.R32G32B32A32_Float, 0, 0),
+                        new InputElement("COLOR", 0, Format.R32G32B32A32_Float, 16, 0)
+                    });
+            
+            // Instantiate Vertex buiffer from vertex data
+            var vertices = Buffer.Create(device, BindFlags.VertexBuffer, new[]
+                                  {
+                                      new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f), // Front
+                                      new Vector4(-1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+                                      new Vector4( 1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+                                      new Vector4( 1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+                                      new Vector4( 1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
 
-            // Instantiate Vertex buffer from vertex data
-            var vertices = Buffer.Create(
-                device,
-                BindFlags.VertexBuffer,
-                new[]
-                {
-                    new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f), // Front
-                    new Vector4(-1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
-                    new Vector4( 1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
-                    new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
-                    new Vector4( 1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
-                    new Vector4( 1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f), // BACK
+                                      new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4( 1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
 
-                    new Vector4(-1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f), // BACK
-                    new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4(-1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4(-1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4( 1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f, 1.0f, -1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f), // Top
+                                      new Vector4(-1.0f, 1.0f,  1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4( 1.0f, 1.0f,  1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4(-1.0f, 1.0f, -1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4( 1.0f, 1.0f,  1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4( 1.0f, 1.0f, -1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
 
-                    new Vector4(-1.0f, 1.0f, -1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f), // Top
-                    new Vector4(-1.0f, 1.0f,  1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4( 1.0f, 1.0f,  1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4(-1.0f, 1.0f, -1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4( 1.0f, 1.0f,  1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4( 1.0f, 1.0f, -1.0f,  1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4(-1.0f,-1.0f, -1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f), // Bottom
+                                      new Vector4( 1.0f,-1.0f,  1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f,-1.0f,  1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f,-1.0f, -1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4( 1.0f,-1.0f, -1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4( 1.0f,-1.0f,  1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
 
-                    new Vector4(-1.0f, -1.0f, -1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f), // Bottom
-                    new Vector4( 1.0f, -1.0f,  1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4(-1.0f, -1.0f,  1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4(-1.0f, -1.0f, -1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4( 1.0f, -1.0f, -1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-                    new Vector4( 1.0f, -1.0f,  1.0f,  1.0f), new Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+                                      new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f), // Left
+                                      new Vector4(-1.0f, -1.0f,  1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4(-1.0f,  1.0f,  1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4(-1.0f,  1.0f,  1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
+                                      new Vector4(-1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
 
-                    new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f), // Left
-                    new Vector4(-1.0f, -1.0f,  1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4(-1.0f,  1.0f,  1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4(-1.0f, -1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4(-1.0f,  1.0f,  1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
-                    new Vector4(-1.0f,  1.0f, -1.0f, 1.0f), new Vector4(1.0f, 0.0f, 1.0f, 1.0f),
-
-                    new Vector4( 1.0f, -1.0f, -1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f), // Right
-                    new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
-                    new Vector4( 1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
-                    new Vector4( 1.0f, -1.0f, -1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
-                    new Vector4( 1.0f,  1.0f, -1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
-                    new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
-                });
+                                      new Vector4( 1.0f, -1.0f, -1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f), // Right
+                                      new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
+                                      new Vector4( 1.0f, -1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
+                                      new Vector4( 1.0f, -1.0f, -1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
+                                      new Vector4( 1.0f,  1.0f, -1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
+                                      new Vector4( 1.0f,  1.0f,  1.0f, 1.0f), new Vector4(0.0f, 1.0f, 1.0f, 1.0f),
+                            });
 
             // Create Constant Buffer
             _contantBuffer = new Buffer(device, Utilities.SizeOf<Matrix>(), ResourceUsage.Default, BindFlags.ConstantBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
 
-            var context = Direct2D1Platform.Direct3D11Device.ImmediateContext;
+            var context = _d3dDevice.ImmediateContext;
 
             // Prepare All the stages
             context.InputAssembler.InputLayout = layout;
@@ -192,73 +182,63 @@ namespace Direct3DInteropSample
             context.PixelShader.Set(pixelShader);
         }
 
-        private void Resize(Size size)
+        void Resize(Size size)
         {
-            Utilities.Dispose(ref _deviceContext);
-            Utilities.Dispose(ref _backBuffer);
-            Utilities.Dispose(ref _renderView);
-            Utilities.Dispose(ref _depthBuffer);
-            Utilities.Dispose(ref _depthView);
-            var context = Direct2D1Platform.Direct3D11Device.ImmediateContext;
-
+            Utilities.Dispose(ref _d2dRenderTarget);
+            Utilities.Dispose(ref backBuffer);
+            Utilities.Dispose(ref renderView);
+            Utilities.Dispose(ref depthBuffer);
+            Utilities.Dispose(ref depthView);
+            var context = _d3dDevice.ImmediateContext;
             // Resize the backbuffer
-            _swapChain.ResizeBuffers(0, 0, 0, Format.Unknown, SwapChainFlags.None);
+            _swapChain.ResizeBuffers(_desc.BufferCount, (int)size.Width, (int)size.Height, Format.Unknown, SwapChainFlags.None);
 
             // Get the backbuffer from the swapchain
-            _backBuffer = Resource.FromSwapChain<Texture2D>(_swapChain, 0);
+            backBuffer = Texture2D.FromSwapChain<Texture2D>(_swapChain, 0);
 
             // Renderview on the backbuffer
-            _renderView = new RenderTargetView(Direct2D1Platform.Direct3D11Device, _backBuffer);
+            renderView = new RenderTargetView(_d3dDevice, backBuffer);
 
             // Create the depth buffer
-            _depthBuffer = new Texture2D(
-                Direct2D1Platform.Direct3D11Device,
-                new Texture2DDescription()
-                {
-                    Format = Format.D32_Float_S8X24_UInt,
-                    ArraySize = 1,
-                    MipLevels = 1,
-                    Width = (int)size.Width,
-                    Height = (int)size.Height,
-                    SampleDescription = new SampleDescription(1, 0),
-                    Usage = ResourceUsage.Default,
-                    BindFlags = BindFlags.DepthStencil,
-                    CpuAccessFlags = CpuAccessFlags.None,
-                    OptionFlags = ResourceOptionFlags.None
-                });
+            depthBuffer = new Texture2D(_d3dDevice, new Texture2DDescription()
+            {
+                Format = Format.D32_Float_S8X24_UInt,
+                ArraySize = 1,
+                MipLevels = 1,
+                Width = (int)size.Width,
+                Height = (int)size.Height,
+                SampleDescription = new SampleDescription(1, 0),
+                Usage = ResourceUsage.Default,
+                BindFlags = BindFlags.DepthStencil,
+                CpuAccessFlags = CpuAccessFlags.None,
+                OptionFlags = ResourceOptionFlags.None
+            });
 
             // Create the depth buffer view
-            _depthView = new DepthStencilView(Direct2D1Platform.Direct3D11Device, _depthBuffer);
+            depthView = new DepthStencilView(_d3dDevice, depthBuffer);
 
             // Setup targets and viewport for rendering
             context.Rasterizer.SetViewport(new Viewport(0, 0, (int)size.Width, (int)size.Height, 0.0f, 1.0f));
-            context.OutputMerger.SetTargets(_depthView, _renderView);
+            context.OutputMerger.SetTargets(depthView, renderView);
 
             // Setup new projection matrix with correct aspect ratio
             _proj = Matrix.PerspectiveFovLH((float)Math.PI / 4.0f, (float)(size.Width / size.Height), 0.1f, 100.0f);
 
             using (var dxgiBackBuffer = _swapChain.GetBackBuffer<Surface>(0))
             {
-                var renderTarget = new SharpDX.Direct2D1.RenderTarget(
-                    Direct2D1Platform.Direct2D1Factory,
-                    dxgiBackBuffer,
-                    new RenderTargetProperties
+                _d2dRenderTarget = new RenderTarget(AvaloniaLocator.Current.GetService<SharpDX.Direct2D1.Factory>()
+                    , dxgiBackBuffer, new RenderTargetProperties
                     {
                         DpiX = 96,
                         DpiY = 96,
                         Type = RenderTargetType.Default,
-                        PixelFormat = new PixelFormat(
-                            Format.Unknown,
-                            AlphaMode.Premultiplied)
+                        PixelFormat = new PixelFormat(Format.Unknown, AlphaMode.Premultiplied)
                     });
-
-                _deviceContext = renderTarget.QueryInterface<DeviceContext>();
-
-                renderTarget.Dispose();
             }
+
         }
 
-        private class D3DRenderTarget : IRenderTarget
+        class D3DRenderTarget: IRenderTarget
         {
             private readonly MainWindow _window;
 
@@ -266,14 +246,15 @@ namespace Direct3DInteropSample
             {
                 _window = window;
             }
-
             public void Dispose()
             {
+                
             }
 
             public IDrawingContextImpl CreateDrawingContext(IVisualBrushRenderer visualBrushRenderer)
             {
-                return new DrawingContextImpl(visualBrushRenderer, null, _window._deviceContext);
+                return new DrawingContextImpl(visualBrushRenderer, _window._d2dRenderTarget,
+                    AvaloniaLocator.Current.GetService<SharpDX.DirectWrite.Factory>());
             }
         }
 

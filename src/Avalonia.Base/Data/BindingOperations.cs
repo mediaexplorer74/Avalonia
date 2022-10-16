@@ -1,4 +1,8 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
+using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
@@ -6,8 +10,6 @@ namespace Avalonia.Data
 {
     public static class BindingOperations
     {
-        public static readonly object DoNothing = new DoNothingType();
-
         /// <summary>
         /// Applies an <see cref="InstancedBinding"/> a property on an <see cref="IAvaloniaObject"/>.
         /// </summary>
@@ -18,18 +20,18 @@ namespace Avalonia.Data
         /// An optional anchor from which to locate required context. When binding to objects that
         /// are not in the logical tree, certain types of binding need an anchor into the tree in 
         /// order to locate named controls or resources. The <paramref name="anchor"/> parameter 
-        /// can be used to provide this context.
+        /// can be used to provice this context.
         /// </param>
         /// <returns>An <see cref="IDisposable"/> which can be used to cancel the binding.</returns>
         public static IDisposable Apply(
             IAvaloniaObject target,
             AvaloniaProperty property,
             InstancedBinding binding,
-            object? anchor)
+            object anchor)
         {
-            _ = target ?? throw new ArgumentNullException(nameof(target));
-            _ = property ?? throw new ArgumentNullException(nameof(property));
-            _ = binding ?? throw new ArgumentNullException(nameof(binding));
+            Contract.Requires<ArgumentNullException>(target != null);
+            Contract.Requires<ArgumentNullException>(property != null);
+            Contract.Requires<ArgumentNullException>(binding != null);
 
             var mode = binding.Mode;
 
@@ -42,13 +44,9 @@ namespace Avalonia.Data
             {
                 case BindingMode.Default:
                 case BindingMode.OneWay:
-                    if (binding.Observable is null)
-                        throw new InvalidOperationException("InstancedBinding does not contain an observable.");
-                    return target.Bind(property, binding.Observable, binding.Priority);
+                    return target.Bind(property, binding.Observable ?? binding.Subject, binding.Priority);
                 case BindingMode.TwoWay:
-                    if (binding.Subject is null)
-                        throw new InvalidOperationException("InstancedBinding does not contain a subject.");
-                    return new TwoWayBindingDisposable(
+                    return new CompositeDisposable(
                         target.Bind(property, binding.Subject, binding.Priority),
                         target.GetObservable(property).Subscribe(binding.Subject));
                 case BindingMode.OneTime:
@@ -56,83 +54,21 @@ namespace Avalonia.Data
 
                     if (source != null)
                     {
-                        // Perf: Avoid allocating closure in the outer scope.
-                        var targetCopy = target;
-                        var propertyCopy = property;
-                        var bindingCopy = binding;
-
                         return source
                             .Where(x => BindingNotification.ExtractValue(x) != AvaloniaProperty.UnsetValue)
                             .Take(1)
-                            .Subscribe(x => targetCopy.SetValue(
-                                propertyCopy,
-                                BindingNotification.ExtractValue(x),
-                                bindingCopy.Priority));
+                            .Subscribe(x => target.SetValue(property, x, binding.Priority));
                     }
                     else
                     {
                         target.SetValue(property, binding.Value, binding.Priority);
                         return Disposable.Empty;
                     }
-
                 case BindingMode.OneWayToSource:
-                {
-                    if (binding.Observable is null)
-                        throw new InvalidOperationException("InstancedBinding does not contain an observable.");
-                    if (binding.Subject is null)
-                        throw new InvalidOperationException("InstancedBinding does not contain a subject.");
-
-                    // Perf: Avoid allocating closure in the outer scope.
-                    var bindingCopy = binding;
-
-                    return Observable.CombineLatest(
-                        binding.Observable,
-                        target.GetObservable(property),
-                        (_, v) => v)
-                    .Subscribe(x => bindingCopy.Subject.OnNext(x));
-                }
-
+                    return target.GetObservable(property).Subscribe(binding.Subject);
                 default:
                     throw new ArgumentException("Invalid binding mode.");
             }
         }
-
-        private sealed class TwoWayBindingDisposable : IDisposable
-        {
-            private readonly IDisposable _toTargetSubscription;
-            private readonly IDisposable _fromTargetSubsription;
-
-            private bool _isDisposed;
-
-            public TwoWayBindingDisposable(IDisposable toTargetSubscription, IDisposable fromTargetSubsription)
-            {
-                _toTargetSubscription = toTargetSubscription;
-                _fromTargetSubsription = fromTargetSubsription;
-            }
-
-            public void Dispose()
-            {
-                if (_isDisposed)
-                {
-                    return;
-                }
-
-                _fromTargetSubsription.Dispose();
-                _toTargetSubscription.Dispose();
-
-                _isDisposed = true;
-            }
-        }
-    }
-
-    public sealed class DoNothingType
-    {
-        internal DoNothingType() { }
-
-        /// <summary>
-        /// Returns the string representation of <see cref="BindingOperations.DoNothing"/>.
-        /// </summary>
-        /// <returns>The string "(do nothing)".</returns>
-        public override string ToString() => "(do nothing)";
     }
 }

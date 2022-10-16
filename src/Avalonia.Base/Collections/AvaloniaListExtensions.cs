@@ -1,8 +1,11 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Linq;
 using System.Reactive.Disposables;
 
 namespace Avalonia.Collections
@@ -30,18 +33,14 @@ namespace Avalonia.Collections
         /// <param name="reset">
         /// An action called when the collection is reset.
         /// </param>
-        /// <param name="weakSubscription">
-        /// Indicates if a weak subscription should be used to track changes to the collection.
-        /// </param>
         /// <returns>A disposable used to terminate the subscription.</returns>
         public static IDisposable ForEachItem<T>(
             this IAvaloniaReadOnlyList<T> collection,
             Action<T> added,
             Action<T> removed,
-            Action reset,
-            bool weakSubscription = false)
+            Action reset)
         {
-            return collection.ForEachItem((_, i) => added(i), (_, i) => removed(i), reset, weakSubscription);
+            return collection.ForEachItem((_, i) => added(i), (_, i) => removed(i), reset);
         }
 
         /// <summary>
@@ -60,57 +59,56 @@ namespace Avalonia.Collections
         /// the index in the collection and the item.
         /// </param>
         /// <param name="reset">
-        /// An action called when the collection is reset. This will be followed by calls to 
-        /// <paramref name="added"/> for each item present in the collection after the reset.
-        /// </param>
-        /// <param name="weakSubscription">
-        /// Indicates if a weak subscription should be used to track changes to the collection.
+        /// An action called when the collection is reset.
         /// </param>
         /// <returns>A disposable used to terminate the subscription.</returns>
         public static IDisposable ForEachItem<T>(
             this IAvaloniaReadOnlyList<T> collection,
             Action<int, T> added,
             Action<int, T> removed,
-            Action reset,
-            bool weakSubscription = false)
+            Action reset)
         {
-            void Add(int index, IList items)
-            {
-                foreach (T item in items)
-                {
-                    added(index++, item);
-                }
-            }
-
-            void Remove(int index, IList items)
-            {
-                for (var i = items.Count - 1; i >= 0; --i)
-                {
-                    removed(index + i, (T)items[i]!);
-                }
-            }
+            int index;
 
             NotifyCollectionChangedEventHandler handler = (_, e) =>
             {
                 switch (e.Action)
                 {
                     case NotifyCollectionChangedAction.Add:
-                        Add(e.NewStartingIndex, e.NewItems!);
+                        index = e.NewStartingIndex;
+
+                        foreach (T item in e.NewItems)
+                        {
+                            added(index++, item);
+                        }
+
                         break;
 
-                    case NotifyCollectionChangedAction.Move:
                     case NotifyCollectionChangedAction.Replace:
-                        Remove(e.OldStartingIndex, e.OldItems!);
-                        int newIndex = e.NewStartingIndex;
-                        if(newIndex > e.OldStartingIndex)
+                        index = e.OldStartingIndex;
+
+                        foreach (T item in e.OldItems)
                         {
-                            newIndex -= e.OldItems!.Count;
+                            removed(index++, item);
                         }
-                        Add(newIndex, e.NewItems!);
+
+                        index = e.NewStartingIndex;
+
+                        foreach (T item in e.NewItems)
+                        {
+                            added(index++, item);
+                        }
+
                         break;
 
                     case NotifyCollectionChangedAction.Remove:
-                        Remove(e.OldStartingIndex, e.OldItems!);
+                        index = e.OldStartingIndex;
+
+                        foreach (T item in e.OldItems)
+                        {
+                            removed(index++, item);
+                        }
+
                         break;
 
                     case NotifyCollectionChangedAction.Reset:
@@ -121,23 +119,79 @@ namespace Avalonia.Collections
                         }
 
                         reset();
-                        Add(0, (IList)collection);
                         break;
                 }
             };
 
-            Add(0, (IList)collection);
-
-            if (weakSubscription)
+            index = 0;
+            foreach (T i in collection)
             {
-                return collection.WeakSubscribe(handler);
+                added(index++, i);
             }
-            else
-            {
-                collection.CollectionChanged += handler;
 
-                return Disposable.Create(() => collection.CollectionChanged -= handler);
-            }
+            collection.CollectionChanged += handler;
+
+            return Disposable.Create(() => collection.CollectionChanged -= handler);
+        }
+
+        /// <summary>
+        /// Invokes an action for each item in a collection and subsequently each item added or
+        /// removed from the collection.
+        /// </summary>
+        /// <typeparam name="T">The type of the collection items.</typeparam>
+        /// <param name="collection">The collection.</param>
+        /// <param name="added">
+        /// An action called initially with all items in the collection and subsequently with a
+        /// list of items added to the collection. The parameters passed are the index of the
+        /// first item added to the collection and the items added.
+        /// </param>
+        /// <param name="removed">
+        /// An action called with all items removed from the collection. The parameters passed 
+        /// are the index of the first item removed from the collection and the items removed.
+        /// </param>
+        /// <param name="reset">
+        /// An action called when the collection is reset.
+        /// </param>
+        /// <returns>A disposable used to terminate the subscription.</returns>
+        public static IDisposable ForEachItem<T>(
+            this IAvaloniaReadOnlyList<T> collection,
+            Action<int, IEnumerable<T>> added,
+            Action<int, IEnumerable<T>> removed,
+            Action reset)
+        {
+            NotifyCollectionChangedEventHandler handler = (_, e) =>
+            {
+                switch (e.Action)
+                {
+                    case NotifyCollectionChangedAction.Add:
+                        added(e.NewStartingIndex, e.NewItems.Cast<T>());
+                        break;
+
+                    case NotifyCollectionChangedAction.Replace:
+                        removed(e.OldStartingIndex, e.OldItems.Cast<T>());
+                        added(e.NewStartingIndex, e.NewItems.Cast<T>());
+                        break;
+
+                    case NotifyCollectionChangedAction.Remove:
+                        removed(e.OldStartingIndex, e.OldItems.Cast<T>());
+                        break;
+
+                    case NotifyCollectionChangedAction.Reset:
+                        if (reset == null)
+                        {
+                            throw new InvalidOperationException(
+                                "Reset called on collection without reset handler.");
+                        }
+
+                        reset();
+                        break;
+                }
+            };
+
+            added(0, collection);
+            collection.CollectionChanged += handler;
+
+            return Disposable.Create(() => collection.CollectionChanged -= handler);
         }
 
         /// <summary>
@@ -149,7 +203,7 @@ namespace Avalonia.Collections
         /// <returns>A disposable used to terminate the subscription.</returns>
         public static IDisposable TrackItemPropertyChanged<T>(
             this IAvaloniaReadOnlyList<T> collection,
-            Action<Tuple<object?, PropertyChangedEventArgs>> callback)
+            Action<Tuple<object, PropertyChangedEventArgs>> callback)
         {
             List<INotifyPropertyChanged> tracked = new List<INotifyPropertyChanged>();
 
@@ -179,7 +233,7 @@ namespace Avalonia.Collections
                         tracked.Remove(inpc);
                     }
                 },
-                () => throw new NotSupportedException("Collection reset not supported."));
+                null);
 
             return Disposable.Create(() =>
             {

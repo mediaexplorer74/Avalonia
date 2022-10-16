@@ -1,18 +1,20 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
-using Avalonia.Metadata;
-using SharpDX.WIC;
-using Bitmap = SharpDX.Direct2D1.Bitmap;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Avalonia.Platform;
+using SharpDX.Direct2D1;
 
 namespace Avalonia.Direct2D1.Media
 {
     /// <summary>
     /// A Direct2D Bitmap implementation that uses a GPU memory bitmap as its image.
     /// </summary>
-    [Unstable]
     public class D2DBitmapImpl : BitmapImpl
     {
-        private readonly Bitmap _direct2DBitmap;
+        private Bitmap _direct2D;
 
         /// <summary>
         /// Initialize a new instance of the <see cref="BitmapImpl"/> class
@@ -26,35 +28,30 @@ namespace Avalonia.Direct2D1.Media
         /// </remarks>
         public D2DBitmapImpl(Bitmap d2DBitmap)
         {
-            _direct2DBitmap = d2DBitmap ?? throw new ArgumentNullException(nameof(d2DBitmap));
+            if (d2DBitmap == null) throw new ArgumentNullException(nameof(d2DBitmap));
+
+            _direct2D = d2DBitmap;
         }
 
-        public override Vector Dpi => new Vector(96, 96);
-        public override PixelSize PixelSize => _direct2DBitmap.PixelSize.ToAvalonia();
+        public override Bitmap GetDirect2DBitmap(SharpDX.Direct2D1.RenderTarget target) => _direct2D;
+               
+        public override int PixelWidth => _direct2D.PixelSize.Width;
+        public override int PixelHeight => _direct2D.PixelSize.Height;
 
-        public override void Dispose()
+        public override void Save(string fileName)
         {
-            base.Dispose();
-            _direct2DBitmap.Dispose();
-        }
-
-        public override OptionalDispose<Bitmap> GetDirect2DBitmap(SharpDX.Direct2D1.RenderTarget target)
-        {
-            return new OptionalDispose<Bitmap>(_direct2DBitmap, false);
+            throw new NotImplementedException();
         }
 
         public override void Save(Stream stream)
         {
-            using (var encoder = new PngBitmapEncoder(Direct2D1Platform.ImagingFactory, stream))
-            using (var frame = new BitmapFrameEncode(encoder))
-            using (var bitmapSource = _direct2DBitmap.QueryInterface<BitmapSource>())
-            {
-                frame.Initialize();
-                frame.WriteSource(bitmapSource);
-                frame.Commit();
-                encoder.Commit();
-            }
+            throw new NotImplementedException();
+        }
+
+        public override void Dispose()
+        {
+            base.Dispose();
+            _direct2D.Dispose();
         }
     }
 }
-;

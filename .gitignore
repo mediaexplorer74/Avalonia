@@ -94,6 +94,10 @@ publish/
 *.Publish.xml
 *.pubxml
 
+# NuGet Packages Directory
+## TODO: If you have NuGet Package Restore enabled, uncomment the next line
+packages/
+
 # Windows Azure Build Output
 csx
 *.build.csdef
@@ -104,10 +108,7 @@ AppPackages/
 # NCrunch
 _NCrunch_*/
 *.ncrunchsolution.user
-nCrunchTemp_*
-
-# CodeRush
-.cr/
+nCrunchTemp_*/
 
 # Others
 sql/
@@ -120,7 +121,6 @@ ClientBin/
 *.[Pp]ublish.xml
 *.pfx
 *.publishsettings
-Events_Avalonia.cs
 
 # RIA/Silverlight projects
 Generated_Code/
@@ -159,60 +159,12 @@ $RECYCLE.BIN/
 *.userprefs
 *.nugetreferenceswitcher
 
-
-#################
-## Rider
-#################
-.idea
-
-#################
-## VS Code
-#################
-.vscode/
-
 #################
 ## Cake
 #################
-tools/*
-!tools/packages.config
+tools/
 .nuget
 artifacts/
 nuget
 Avalonia.XBuild.sln
 project.lock.json
-.idea/*
-
-
-##################
-## BenchmarkDotNet
-##################
-BenchmarkDotNet.Artifacts/
-
-dirs.sln
-
-
-##################
-# Xcode
-##################
-Index/
-Logs/
-ModuleCache.noindex/
-Build/Intermediates.noindex/
-build-intermediate
-obj-Direct2D1/
-obj-Skia/
-
-##################
-# Vim
-##################
-.vim
-coc-settings.json
-.ccls-cache
-.ccls
-*.map
-src/Web/Avalonia.Web.Blazor/wwwroot/*.js
-src/Web/Avalonia.Web.Blazor/Interop/Typescript/*.js
-node_modules
-src/Web/Avalonia.Web.Blazor/webapp/package-lock.json
-src/Web/Avalonia.Web.Blazor/wwwroot
-src/Web/Avalonia.Web/wwwroot

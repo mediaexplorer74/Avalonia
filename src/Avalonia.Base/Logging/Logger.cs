@@ -1,3 +1,8 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System.Runtime.CompilerServices;
+
 namespace Avalonia.Logging
 {
     /// <summary>
@@ -6,51 +11,129 @@ namespace Avalonia.Logging
     public static class Logger
     {
         /// <summary>
-        /// Gets or sets the application-defined sink that receives the messages.
+        /// Gets or sets the application-defined sink that recieves the messages.
         /// </summary>
-        public static ILogSink? Sink { get; set; }
+        public static ILogSink Sink { get; set; }
 
         /// <summary>
-        /// Checks if given log level is enabled.
+        /// Logs an event.
         /// </summary>
         /// <param name="level">The log event level.</param>
-        /// <param name="area">The log area.</param>
-        /// <returns><see langword="true"/> if given log level is enabled.</returns>
-        public static bool IsEnabled(LogEventLevel level, string area)
+        /// <param name="area">The area that the event originates.</param>
+        /// <param name="source">The object from which the event originates.</param>
+        /// <param name="messageTemplate">The message template.</param>
+        /// <param name="propertyValues">The message property values.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Log(
+            LogEventLevel level, 
+            string area,
+            object source,
+            string messageTemplate, 
+            params object[] propertyValues)
         {
-            return Sink?.IsEnabled(level, area) == true;
+            Sink?.Log(level, area, source, messageTemplate, propertyValues);
         }
 
         /// <summary>
-        /// Returns parametrized logging sink if given log level is enabled.
+        /// Logs an event with the <see cref="LogEventLevel.Verbose"/> level.
         /// </summary>
-        /// <param name="level">The log event level.</param>
-        /// <param name="area">The area that the event originates from.</param>
-        /// <returns>Log sink or <see langword="null"/> if log level is not enabled.</returns>
-        public static ParametrizedLogger? TryGet(LogEventLevel level, string area)
+        /// <param name="area">The area that the event originates.</param>
+        /// <param name="source">The object from which the event originates.</param>
+        /// <param name="messageTemplate">The message template.</param>
+        /// <param name="propertyValues">The message property values.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Verbose(
+            string area,
+            object source,
+            string messageTemplate, 
+            params object[] propertyValues)
         {
-            if (!IsEnabled(level, area))
-            {
-                return null;
-            }
-
-            return new ParametrizedLogger(Sink!, level, area);
+            Log(LogEventLevel.Verbose, area, source, messageTemplate, propertyValues);
         }
 
         /// <summary>
-        /// Returns parametrized logging sink if given log level is enabled.
+        /// Logs an event with the <see cref="LogEventLevel.Debug"/> level.
         /// </summary>
-        /// <param name="level">The log event level.</param>
-        /// <param name="area">The area that the event originates from.</param>
-        /// <param name="outLogger">Log sink that is valid only if method returns <see langword="true"/>.</param>
-        /// <returns><see langword="true"/> if logger was obtained successfully.</returns>
-        public static bool TryGet(LogEventLevel level, string area, out ParametrizedLogger outLogger)
+        /// <param name="area">The area that the event originates.</param>
+        /// <param name="source">The object from which the event originates.</param>
+        /// <param name="messageTemplate">The message template.</param>
+        /// <param name="propertyValues">The message property values.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Debug(
+            string area,
+            object source,
+            string messageTemplate,
+            params object[] propertyValues)
         {
-            ParametrizedLogger? logger = TryGet(level, area);
+            Log(LogEventLevel.Debug, area, source, messageTemplate, propertyValues);
+        }
 
-            outLogger = logger.GetValueOrDefault();
+        /// <summary>
+        /// Logs an event with the <see cref="LogEventLevel.Information"/> level.
+        /// </summary>
+        /// <param name="area">The area that the event originates.</param>
+        /// <param name="source">The object from which the event originates.</param>
+        /// <param name="messageTemplate">The message template.</param>
+        /// <param name="propertyValues">The message property values.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Information(
+            string area,
+            object source,
+            string messageTemplate,
+            params object[] propertyValues)
+        {
+            Log(LogEventLevel.Information, area, source, messageTemplate, propertyValues);
+        }
 
-            return logger.HasValue;
+        /// <summary>
+        /// Logs an event with the <see cref="LogEventLevel.Warning"/> level.
+        /// </summary>
+        /// <param name="area">The area that the event originates.</param>
+        /// <param name="source">The object from which the event originates.</param>
+        /// <param name="messageTemplate">The message template.</param>
+        /// <param name="propertyValues">The message property values.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Warning(
+            string area,
+            object source,
+            string messageTemplate,
+            params object[] propertyValues)
+        {
+            Log(LogEventLevel.Warning, area, source, messageTemplate, propertyValues);
+        }
+
+        /// <summary>
+        /// Logs an event with the <see cref="LogEventLevel.Error"/> level.
+        /// </summary>
+        /// <param name="area">The area that the event originates.</param>
+        /// <param name="source">The object from which the event originates.</param>
+        /// <param name="messageTemplate">The message template.</param>
+        /// <param name="propertyValues">The message property values.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Error(
+            string area,
+            object source,
+            string messageTemplate, 
+            params object[] propertyValues)
+        {
+            Log(LogEventLevel.Error, area, source, messageTemplate, propertyValues);
+        }
+
+        /// <summary>
+        /// Logs an event with the <see cref="LogEventLevel.Fatal"/> level.
+        /// </summary>
+        /// <param name="area">The area that the event originates.</param>
+        /// <param name="source">The object from which the event originates.</param>
+        /// <param name="messageTemplate">The message template.</param>
+        /// <param name="propertyValues">The message property values.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Fatal(
+            string area,
+            object source,
+            string messageTemplate,
+            params object[] propertyValues)
+        {
+            Log(LogEventLevel.Fatal, area, source, messageTemplate, propertyValues);
         }
     }
 }

@@ -1,14 +1,16 @@
-using System.Collections.ObjectModel;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System.Collections.Specialized;
 using System.Linq;
 using Avalonia.Collections;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
-using Avalonia.Input;
 using Avalonia.LogicalTree;
-using Avalonia.Styling;
-using Avalonia.UnitTests;
+using Avalonia.VisualTree;
 using Xunit;
+using System.Collections.ObjectModel;
+using Avalonia.UnitTests;
 
 namespace Avalonia.Controls.UnitTests
 {
@@ -20,7 +22,7 @@ namespace Avalonia.Controls.UnitTests
             var target = new ItemsControl
             {
                 Template = GetTemplate(),
-                ItemTemplate = new FuncDataTemplate<string>((_, __) => new Canvas()),
+                ItemTemplate = new FuncDataTemplate<string>(_ => new Canvas()),
             };
 
             target.Items = new[] { "Foo" };
@@ -62,26 +64,7 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
-        public void Container_Should_Have_Theme_Set_To_ItemContainerTheme()
-        {
-            var theme = new ControlTheme();
-            var target = new ItemsControl
-            {
-                ItemContainerTheme = theme,
-            };
-
-            target.Template = GetTemplate();
-            target.Items = new[] { "Foo" };
-            target.ApplyTemplate();
-            target.Presenter.ApplyTemplate();
-
-            var container = (ContentPresenter)target.Presenter.Panel.Children[0];
-
-            Assert.Same(container.Theme, theme);
-        }
-
-        [Fact]
-        public void Container_Should_Have_LogicalParent_Set_To_ItemsControl()
+        public void Container_Child_Should_Have_LogicalParent_Set_To_Container()
         {
             using (UnitTestApplication.Start(TestServices.StyledWindow))
             {
@@ -91,7 +74,7 @@ namespace Avalonia.Controls.UnitTests
                 root.Content = target;
 
                 var templatedParent = new Button();
-                target.SetValue(StyledElement.TemplatedParentProperty, templatedParent);
+                target.TemplatedParent = templatedParent;
                 target.Template = GetTemplate();
 
                 target.Items = new[] { "Foo" };
@@ -102,7 +85,7 @@ namespace Avalonia.Controls.UnitTests
 
                 var container = (ContentPresenter)target.Presenter.Panel.Children[0];
 
-                Assert.Equal(target, container.Parent);
+                Assert.Equal(container, container.Child.Parent);
             }
         }
 
@@ -118,28 +101,6 @@ namespace Avalonia.Controls.UnitTests
             Assert.Equal(child.Parent, target);
             Assert.Equal(child.GetLogicalParent(), target);
             Assert.Equal(new[] { child }, target.GetLogicalChildren());
-        }
-
-        [Fact]
-        public void Added_Container_Should_Have_LogicalParent_Set_To_ItemsControl()
-        {
-            var item = new Border();
-            var items = new ObservableCollection<Border>();
-
-            var target = new ItemsControl
-            {
-                Template = GetTemplate(),
-                Items = items,
-            };
-
-            var root = new TestRoot(true, target);
-
-            root.Measure(new Size(100, 100));
-            root.Arrange(new Rect(0, 0, 100, 100));
-
-            items.Add(item);
-
-            Assert.Equal(target, item.Parent);
         }
 
         [Fact]
@@ -205,7 +166,7 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
-        public void Adding_String_Item_Should_Make_ContentPresenter_Appear_In_LogicalChildren()
+        public void Adding_String_Item_Should_Make_TextBlock_Appear_In_LogicalChildren()
         {
             var target = new ItemsControl();
             var child = new Control();
@@ -217,7 +178,7 @@ namespace Avalonia.Controls.UnitTests
 
             var logical = (ILogical)target;
             Assert.Equal(1, logical.LogicalChildren.Count);
-            Assert.IsType<ContentPresenter>(logical.LogicalChildren[0]);
+            Assert.IsType<TextBlock>(logical.LogicalChildren[0]);
         }
 
         [Fact]
@@ -355,26 +316,6 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
-        public void Should_Clear_Containers_When_ItemsPresenter_Changes()
-        {
-            var target = new ItemsControl
-            {
-                Items = new[] { "foo", "bar" },
-                Template = GetTemplate(),
-            };
-
-            target.ApplyTemplate();
-            target.Presenter.ApplyTemplate();
-
-            Assert.Equal(2, target.ItemContainerGenerator.Containers.Count());
-
-            target.Template = GetTemplate();
-            target.ApplyTemplate();
-
-            Assert.Empty(target.ItemContainerGenerator.Containers);
-        }
-
-        [Fact]
         public void Empty_Class_Should_Initially_Be_Applied()
         {
             var target = new ItemsControl()
@@ -382,7 +323,7 @@ namespace Avalonia.Controls.UnitTests
                 Template = GetTemplate(),
             };
 
-            Assert.Contains(":empty", target.Classes);
+            Assert.True(target.Classes.Contains(":empty"));
         }
 
         [Fact]
@@ -394,18 +335,7 @@ namespace Avalonia.Controls.UnitTests
                 Items = new[] { 1, 2, 3 },
             };
 
-            Assert.DoesNotContain(":empty", target.Classes);
-        }
-
-        [Fact]
-        public void Empty_Class_Should_Be_Set_When_Items_Not_Set()
-        {
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-            };
-
-            Assert.Contains(":empty", target.Classes);
+            Assert.False(target.Classes.Contains(":empty"));
         }
 
         [Fact]
@@ -419,119 +349,7 @@ namespace Avalonia.Controls.UnitTests
 
             target.Items = new int[0];
 
-            Assert.Contains(":empty", target.Classes);
-        }
-
-        [Fact]
-        public void Item_Count_Should_Be_Set_When_Items_Added()
-        {
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-                Items = new[] { 1, 2, 3 },
-            };
-
-            Assert.Equal(3, target.ItemCount);
-        }
-
-        [Fact]
-        public void Item_Count_Should_Be_Set_When_Items_Changed()
-        {
-            var items = new ObservableCollection<int>() { 1, 2, 3 };
-
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-                Items = items,
-            };
-
-            items.Add(4);
-
-            Assert.Equal(4, target.ItemCount);
-
-            items.Clear();
-
-            Assert.Equal(0, target.ItemCount);
-        }
-
-        [Fact]
-        public void Empty_Class_Should_Be_Set_When_Items_Collection_Cleared()
-        {
-            var items = new ObservableCollection<int>() { 1, 2, 3 };
-
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-                Items = items,
-            };
-
-            items.Clear();
-
-            Assert.Contains(":empty", target.Classes);
-        }
-
-        [Fact]
-        public void Empty_Class_Should_Not_Be_Set_When_Items_Collection_Count_Increases()
-        {
-            var items = new ObservableCollection<int>() { };
-
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-                Items = items,
-            };
-
-            items.Add(1);
-
-            Assert.DoesNotContain(":empty", target.Classes);
-        }
-
-        [Fact]
-        public void Single_Item_Class_Should_Be_Set_When_Items_Collection_Count_Increases_To_One()
-        {
-            var items = new ObservableCollection<int>() { };
-
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-                Items = items,
-            };
-
-            items.Add(1);
-
-            Assert.Contains(":singleitem", target.Classes);
-        }
-
-        [Fact]
-        public void Empty_Class_Should_Not_Be_Set_When_Items_Collection_Cleared()
-        {
-            var items = new ObservableCollection<int>() { 1, 2, 3 };
-
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-                Items = items,
-            };
-
-            items.Clear();
-
-            Assert.DoesNotContain(":singleitem", target.Classes);
-        }
-
-        [Fact]
-        public void Single_Item_Class_Should_Not_Be_Set_When_Items_Collection_Count_Increases_Beyond_One()
-        {
-            var items = new ObservableCollection<int>() { 1 };
-
-            var target = new ItemsControl()
-            {
-                Template = GetTemplate(),
-                Items = items,
-            };
-
-            items.Add(2);
-
-            Assert.DoesNotContain(":singleitem", target.Classes);
+            Assert.True(target.Classes.Contains(":empty"));
         }
 
         [Fact]
@@ -542,7 +360,7 @@ namespace Avalonia.Controls.UnitTests
 
             var presenter = new ItemsPresenter
             {
-                [StyledElement.TemplatedParentProperty] = target,
+                TemplatedParent = target,
                 [~ItemsPresenter.ItemsProperty] = target[~ItemsControl.ItemsProperty],
             };
 
@@ -570,9 +388,9 @@ namespace Avalonia.Controls.UnitTests
             {
                 Template = GetTemplate(),
                 DataContext = "Base",
-                DataTemplates =
+                DataTemplates = new DataTemplates
                 {
-                    new FuncDataTemplate<Item>((x, __) => new Button { Content = x })
+                    new FuncDataTemplate<Item>(x => new Button { Content = x })
                 },
                 Items = items,
             };
@@ -589,6 +407,27 @@ namespace Avalonia.Controls.UnitTests
             Assert.Equal(
                 new object[] { items[0], items[1], "Base", "Base" },
                 dataContexts);
+        }
+
+        [Fact]
+        public void MemberSelector_Should_Select_Member()
+        {
+            var target = new ItemsControl
+            {
+                Template = GetTemplate(),
+                Items = new[] { new Item("Foo"), new Item("Bar") },
+                MemberSelector = new FuncMemberSelector<Item, string>(x => x.Value),
+            };
+
+            target.ApplyTemplate();
+            target.Presenter.ApplyTemplate();
+
+            var text = target.Presenter.Panel.Children
+                .Cast<ContentPresenter>()
+                .Select(x => x.Content)
+                .ToList();
+
+            Assert.Equal(new[] { "Foo", "Bar" }, text);
         }
 
         [Fact]
@@ -613,128 +452,26 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
-        public void Focuses_Next_Item_On_Key_Down()
+        public void DataTemplate_Created_Content_Should_Be_NameScope()
         {
-            using (UnitTestApplication.Start(TestServices.RealFocus))
+            var items = new object[]
             {
-                var items = new object[]
-                {
-                    new Button(),
-                    new Button(),
-                };
+                "foo",
+            };
 
-                var target = new ItemsControl
-                {
-                    Template = GetTemplate(),
-                    Items = items,
-                };
-
-                var root = new TestRoot { Child = target };
-
-                target.ApplyTemplate();
-                target.Presenter.ApplyTemplate();
-                target.Presenter.Panel.Children[0].Focus();
-
-                target.RaiseEvent(new KeyEventArgs
-                {
-                    RoutedEvent = InputElement.KeyDownEvent,
-                    Key = Key.Down,
-                });
-
-                Assert.Equal(
-                    target.Presenter.Panel.Children[1],
-                    FocusManager.Instance.Current);
-            }
-        }
-
-        [Fact]
-        public void Does_Not_Focus_Non_Focusable_Item_On_Key_Down()
-        {
-            using (UnitTestApplication.Start(TestServices.RealFocus))
-            {
-                var items = new object[]
-                {
-                    new Button(),
-                    new Button { Focusable = false },
-                    new Button(),
-                };
-
-                var target = new ItemsControl
-                {
-                    Template = GetTemplate(),
-                    Items = items,
-                };
-
-                var root = new TestRoot { Child = target };
-
-                target.ApplyTemplate();
-                target.Presenter.ApplyTemplate();
-                target.Presenter.Panel.Children[0].Focus();
-
-                target.RaiseEvent(new KeyEventArgs
-                {
-                    RoutedEvent = InputElement.KeyDownEvent,
-                    Key = Key.Down,
-                });
-
-                Assert.Equal(
-                    target.Presenter.Panel.Children[2],
-                    FocusManager.Instance.Current);
-            }
-        }
-
-        [Fact]
-        public void Presenter_Items_Should_Be_In_Sync()
-        {
             var target = new ItemsControl
             {
                 Template = GetTemplate(),
-                Items = new object[]
-                {
-                    new Button(),
-                    new Button(),
-                },
+                Items = items,
             };
-
-            var root = new TestRoot { Child = target };
-            var otherPanel = new StackPanel();
 
             target.ApplyTemplate();
             target.Presenter.ApplyTemplate();
-            
-            target.ItemContainerGenerator.Materialized += (s, e) =>
-            {
-                Assert.IsType<Canvas>(e.Containers[0].Item);
-            };
 
-            target.Items = new[]
-            {
-                new Canvas()
-            };
-        }
+            var container = (ContentPresenter)target.Presenter.Panel.LogicalChildren[0];
+            container.UpdateChild();
 
-        [Fact]
-        public void Detaching_Then_Reattaching_To_Logical_Tree_Twice_Does_Not_Throw()
-        {
-            // # Issue 3487
-            var target = new ItemsControl
-            {
-                Template = GetTemplate(),
-                Items = new[] { "foo", "bar" },
-                ItemTemplate = new FuncDataTemplate<string>((_, __) => new Canvas()),
-            };
-
-            var root = new TestRoot(target);
-            root.Measure(Size.Infinity);
-            root.Arrange(new Rect(root.DesiredSize));
-
-            root.Child = null;
-            root.Child = target;
-
-            target.Measure(Size.Infinity);
-
-            root.Child = null;
-            root.Child = target;
+            Assert.NotNull(NameScope.GetNameScope((TextBlock)container.Child));
         }
 
         private class Item
@@ -749,7 +486,7 @@ namespace Avalonia.Controls.UnitTests
 
         private FuncControlTemplate GetTemplate()
         {
-            return new FuncControlTemplate<ItemsControl>((parent, scope) =>
+            return new FuncControlTemplate<ItemsControl>(parent =>
             {
                 return new Border
                 {
@@ -757,8 +494,9 @@ namespace Avalonia.Controls.UnitTests
                     Child = new ItemsPresenter
                     {
                         Name = "PART_ItemsPresenter",
+                        MemberSelector = parent.MemberSelector,
                         [~ItemsPresenter.ItemsProperty] = parent[~ItemsControl.ItemsProperty],
-                    }.RegisterInNameScope(scope)
+                    }
                 };
             });
         }

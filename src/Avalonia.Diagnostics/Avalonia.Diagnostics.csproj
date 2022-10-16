@@ -1,30 +1,55 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net6.0;netstandard2.0</TargetFrameworks>
-    <RootNamespace>Avalonia</RootNamespace>
-    <PackageId>Avalonia.Diagnostics</PackageId>
+    <TargetFramework>netstandard1.1</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\Avalonia.Diagnostics.XML</DocumentationFile>
+    <NoWarn>CS1591</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\Avalonia.Diagnostics.XML</DocumentationFile>
+    <NoWarn>CS1591</NoWarn>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Markup\Avalonia.Markup.Xaml\Avalonia.Markup.Xaml.csproj" />
+    <ProjectReference Include="..\Markup\Avalonia.Markup\Avalonia.Markup.csproj" />
+    <ProjectReference Include="..\Avalonia.Animation\Avalonia.Animation.csproj" />
+    <ProjectReference Include="..\Avalonia.Base\Avalonia.Base.csproj" />
+    <ProjectReference Include="..\Avalonia.Controls\Avalonia.Controls.csproj" />
+    <ProjectReference Include="..\Avalonia.Input\Avalonia.Input.csproj" />
+    <ProjectReference Include="..\Avalonia.Interactivity\Avalonia.Interactivity.csproj" />
+    <ProjectReference Include="..\Avalonia.Layout\Avalonia.Layout.csproj" />
+    <ProjectReference Include="..\Avalonia.ReactiveUI\Avalonia.ReactiveUI.csproj" />
+    <ProjectReference Include="..\Avalonia.Visuals\Avalonia.Visuals.csproj" />
+    <ProjectReference Include="..\Avalonia.Styling\Avalonia.Styling.csproj" />
+    <ProjectReference Include="..\Avalonia.Themes.Default\Avalonia.Themes.Default.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\SharedAssemblyInfo.cs">
+      <Link>Properties\SharedAssemblyInfo.cs</Link>
+    </Compile>
     <Compile Update="**\*.xaml.cs">
       <DependentUpon>%(Filename)</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="**\*.xaml">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Avalonia.Controls.ColorPicker\Avalonia.Controls.ColorPicker.csproj" />
-    <ProjectReference Include="..\Avalonia.Controls.DataGrid\Avalonia.Controls.DataGrid.csproj" />
-    <ProjectReference Include="..\Markup\Avalonia.Markup.Xaml\Avalonia.Markup.Xaml.csproj" />
-    <ProjectReference Include="..\Markup\Avalonia.Markup\Avalonia.Markup.csproj" />
-    <ProjectReference Include="..\Avalonia.Base\Avalonia.Base.csproj" />
-    <ProjectReference Include="..\Avalonia.Controls\Avalonia.Controls.csproj" />
-    <ProjectReference Include="..\Avalonia.Themes.Simple\Avalonia.Themes.Simple.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="3.4.0" />
-  </ItemGroup>
-  <Import Project="..\..\build\EmbedXaml.props" />
   <Import Project="..\..\build\Rx.props" />
-  <Import Project="..\..\build\BuildTargets.targets" />
-  <Import Project="..\..\build\ApiDiff.props" />
-  <Import Project="..\..\build\NullableEnable.props" />
-  <Import Project="..\..\build\DevAnalyzers.props" />
+  <Import Project="..\..\build\Splat.props" />
 </Project>

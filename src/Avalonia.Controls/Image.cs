@@ -1,11 +1,12 @@
-using Avalonia.Automation;
-using Avalonia.Automation.Peers;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Metadata;
 
 namespace Avalonia.Controls
-{   
+{
     /// <summary>
     /// Displays a <see cref="Bitmap"/> image.
     /// </summary>
@@ -14,8 +15,8 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="Source"/> property.
         /// </summary>
-        public static readonly StyledProperty<IImage> SourceProperty =
-            AvaloniaProperty.Register<Image, IImage>(nameof(Source));
+        public static readonly StyledProperty<IBitmap> SourceProperty =
+            AvaloniaProperty.Register<Image, IBitmap>(nameof(Source));
 
         /// <summary>
         /// Defines the <see cref="Stretch"/> property.
@@ -23,26 +24,16 @@ namespace Avalonia.Controls
         public static readonly StyledProperty<Stretch> StretchProperty =
             AvaloniaProperty.Register<Image, Stretch>(nameof(Stretch), Stretch.Uniform);
 
-        /// <summary>
-        /// Defines the <see cref="StretchDirection"/> property.
-        /// </summary>
-        public static readonly StyledProperty<StretchDirection> StretchDirectionProperty =
-            AvaloniaProperty.Register<Image, StretchDirection>(
-                nameof(StretchDirection),
-                StretchDirection.Both);
-
         static Image()
         {
-            AffectsRender<Image>(SourceProperty, StretchProperty, StretchDirectionProperty);
-            AffectsMeasure<Image>(SourceProperty, StretchProperty, StretchDirectionProperty);
-            AutomationProperties.ControlTypeOverrideProperty.OverrideDefaultValue<Image>(AutomationControlType.Image);
+            AffectsRender(SourceProperty);
+            AffectsRender(StretchProperty);
         }
 
         /// <summary>
-        /// Gets or sets the image that will be displayed.
+        /// Gets or sets the bitmap image that will be displayed.
         /// </summary>
-        [Content]
-        public IImage Source
+        public IBitmap Source
         {
             get { return GetValue(SourceProperty); }
             set { SetValue(SourceProperty, value); }
@@ -53,21 +44,10 @@ namespace Avalonia.Controls
         /// </summary>
         public Stretch Stretch
         {
-            get { return GetValue(StretchProperty); }
+            get { return (Stretch)GetValue(StretchProperty); }
             set { SetValue(StretchProperty, value); }
         }
 
-        /// <summary>
-        /// Gets or sets a value controlling in what direction the image will be stretched.
-        /// </summary>
-        public StretchDirection StretchDirection
-        {
-            get { return GetValue(StretchDirectionProperty); }
-            set { SetValue(StretchDirectionProperty, value); }
-        }
-
-        protected override bool BypassFlowDirectionPolicies => true;
-        
         /// <summary>
         /// Renders the control.
         /// </summary>
@@ -76,12 +56,11 @@ namespace Avalonia.Controls
         {
             var source = Source;
 
-            if (source != null && Bounds.Width > 0 && Bounds.Height > 0)
+            if (source != null)
             {
                 Rect viewPort = new Rect(Bounds.Size);
-                Size sourceSize = source.Size;
-
-                Vector scale = Stretch.CalculateScaling(Bounds.Size, sourceSize, StretchDirection);
+                Size sourceSize = new Size(source.PixelWidth, source.PixelHeight);
+                Vector scale = Stretch.CalculateScaling(Bounds.Size, sourceSize);
                 Size scaledSize = sourceSize * scale;
                 Rect destRect = viewPort
                     .CenterRect(new Rect(scaledSize))
@@ -89,9 +68,7 @@ namespace Avalonia.Controls
                 Rect sourceRect = new Rect(sourceSize)
                     .CenterRect(new Rect(destRect.Size / scale));
 
-                var interpolationMode = RenderOptions.GetBitmapInterpolationMode(this);
-
-                context.DrawImage(source, sourceRect, destRect, interpolationMode);
+                context.DrawImage(source, 1, sourceRect, destRect);
             }
         }
 
@@ -103,26 +80,19 @@ namespace Avalonia.Controls
         protected override Size MeasureOverride(Size availableSize)
         {
             var source = Source;
-            var result = new Size();
 
             if (source != null)
             {
-                result = Stretch.CalculateSize(availableSize, source.Size, StretchDirection);
-            }
+                Size sourceSize = new Size(source.PixelWidth, source.PixelHeight);
 
-            return result;
-        }
-
-        /// <inheritdoc/>
-        protected override Size ArrangeOverride(Size finalSize)
-        {
-            var source = Source;
-
-            if (source != null)
-            {
-                var sourceSize = source.Size;
-                var result = Stretch.CalculateSize(finalSize, sourceSize);
-                return result;
+                if (double.IsInfinity(availableSize.Width) || double.IsInfinity(availableSize.Height))
+                {
+                    return sourceSize;
+                }
+                else
+                {
+                    return Stretch.CalculateSize(availableSize, sourceSize);
+                }
             }
             else
             {

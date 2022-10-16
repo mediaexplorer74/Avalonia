@@ -1,13 +1,11 @@
-using System;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
 
 namespace Avalonia.Win32
 {
-    public static class PlatformConstants
+    static class PlatformConstants
     {
         public const string WindowHandleType = "HWND";
         public const string CursorHandleType = "HCURSOR";
-
-        public static readonly Version Windows8 = new Version(6, 2);
-        public static readonly Version Windows7 = new Version(6, 1);
     }
 }

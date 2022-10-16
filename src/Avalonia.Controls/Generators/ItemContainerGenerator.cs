@@ -1,10 +1,12 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
-using Avalonia.Styling;
 
 namespace Avalonia.Controls.Generators
 {
@@ -13,7 +15,7 @@ namespace Avalonia.Controls.Generators
     /// </summary>
     public class ItemContainerGenerator : IItemContainerGenerator
     {
-        private SortedDictionary<int, ItemContainerInfo> _containers = new SortedDictionary<int, ItemContainerInfo>();
+        private Dictionary<int, ItemContainerInfo> _containers = new Dictionary<int, ItemContainerInfo>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ItemContainerGenerator"/> class.
@@ -21,30 +23,27 @@ namespace Avalonia.Controls.Generators
         /// <param name="owner">The owner control.</param>
         public ItemContainerGenerator(IControl owner)
         {
-            Owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            Contract.Requires<ArgumentNullException>(owner != null);
+
+            Owner = owner;
         }
 
         /// <inheritdoc/>
         public IEnumerable<ItemContainerInfo> Containers => _containers.Values;
 
         /// <inheritdoc/>
-        public event EventHandler<ItemContainerEventArgs>? Materialized;
+        public event EventHandler<ItemContainerEventArgs> Materialized;
 
         /// <inheritdoc/>
-        public event EventHandler<ItemContainerEventArgs>? Dematerialized;
+        public event EventHandler<ItemContainerEventArgs> Dematerialized;
 
         /// <inheritdoc/>
-        public event EventHandler<ItemContainerEventArgs>? Recycled;
-
-        /// <summary>
-        /// Gets or sets the theme to be applied to the items in the control.
-        /// </summary>
-        public ControlTheme? ItemContainerTheme { get; set; }
+        public event EventHandler<ItemContainerEventArgs> Recycled;
 
         /// <summary>
         /// Gets or sets the data template used to display the items in the control.
         /// </summary>
-        public IDataTemplate? ItemTemplate { get; set; }
+        public IDataTemplate ItemTemplate { get; set; }
 
         /// <summary>
         /// Gets the owner control.
@@ -52,12 +51,16 @@ namespace Avalonia.Controls.Generators
         public IControl Owner { get; }
 
         /// <inheritdoc/>
-        public virtual Type? ContainerType => null;
+        public virtual Type ContainerType => null;
 
         /// <inheritdoc/>
-        public ItemContainerInfo Materialize(int index, object item)
+        public ItemContainerInfo Materialize(
+            int index,
+            object item,
+            IMemberSelector selector)
         {
-            var container = new ItemContainerInfo(CreateContainer(item)!, item, index);
+            var i = selector != null ? selector.Select(item) : item;
+            var container = new ItemContainerInfo(CreateContainer(i), item, index);
 
             _containers.Add(container.Index, container);
             Materialized?.Invoke(this, new ItemContainerEventArgs(container));
@@ -88,7 +91,7 @@ namespace Avalonia.Controls.Generators
             {
                 var toMove = _containers.Where(x => x.Key >= index)
                     .OrderByDescending(x => x.Key)
-                    .ToArray();
+                    .ToList();
 
                 foreach (var i in toMove)
                 {
@@ -108,7 +111,9 @@ namespace Avalonia.Controls.Generators
             {
                 for (var i = startingIndex; i < startingIndex + count; ++i)
                 {
-                    if (_containers.TryGetValue(i, out var found))
+                    ItemContainerInfo found;
+
+                    if (_containers.TryGetValue(i, out found))
                     {
                         result.Add(found);
                     }
@@ -117,7 +122,7 @@ namespace Avalonia.Controls.Generators
                 }
 
                 var toMove = _containers.Where(x => x.Key >= startingIndex)
-                                        .OrderBy(x => x.Key).ToArray();
+                                        .OrderBy(x => x.Key).ToList();
 
                 foreach (var i in toMove)
                 {
@@ -127,27 +132,28 @@ namespace Avalonia.Controls.Generators
                 }
 
                 Dematerialized?.Invoke(this, new ItemContainerEventArgs(startingIndex, result));
-
-                if (toMove.Length > 0)
-                {
-                    var containers = toMove.Select(x => x.Value).ToArray();
-                    Recycled?.Invoke(this, new ItemContainerEventArgs(containers[0].Index, containers));
-                }
             }
 
             return result;
         }
 
         /// <inheritdoc/>
-        public virtual bool TryRecycle(int oldIndex, int newIndex, object item) => false;
+        public virtual bool TryRecycle(
+            int oldIndex,
+            int newIndex,
+            object item,
+            IMemberSelector selector)
+        {
+            return false;
+        }
 
         /// <inheritdoc/>
         public virtual IEnumerable<ItemContainerInfo> Clear()
         {
-            var result = Containers.ToArray();
+            var result = Containers.ToList();
             _containers.Clear();
 
-            if (result.Length > 0)
+            if (result.Count > 0)
             {
                 Dematerialized?.Invoke(this, new ItemContainerEventArgs(0, result));
             }
@@ -156,15 +162,15 @@ namespace Avalonia.Controls.Generators
         }
 
         /// <inheritdoc/>
-        public IControl? ContainerFromIndex(int index)
+        public IControl ContainerFromIndex(int index)
         {
-            ItemContainerInfo? result;
+            ItemContainerInfo result;
             _containers.TryGetValue(index, out result);
             return result?.ContainerControl;
         }
 
         /// <inheritdoc/>
-        public int IndexFromContainer(IControl? container)
+        public int IndexFromContainer(IControl container)
         {
             foreach (var i in _containers)
             {
@@ -182,7 +188,7 @@ namespace Avalonia.Controls.Generators
         /// </summary>
         /// <param name="item">The item.</param>
         /// <returns>The created container control.</returns>
-        protected virtual IControl? CreateContainer(object item)
+        protected virtual IControl CreateContainer(object item)
         {
             var result = item as IControl;
 
@@ -196,16 +202,8 @@ namespace Avalonia.Controls.Generators
                     result.SetValue(
                         ContentPresenter.ContentTemplateProperty,
                         ItemTemplate,
-                        BindingPriority.Style);
+                        BindingPriority.TemplatedParent);
                 }
-            }
-
-            if (ItemContainerTheme != null)
-            {
-                result.SetValue(
-                    StyledElement.ThemeProperty,
-                    ItemContainerTheme,
-                    BindingPriority.TemplatedParent);
             }
 
             return result;

@@ -1,139 +1,64 @@
-using System;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
 
-using Avalonia.Controls.Documents;
-using Avalonia.Controls.Metadata;
+using System;
+using System.Reactive.Linq;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
-using Avalonia.Controls.Utils;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
-using Avalonia.Metadata;
-using Avalonia.Utilities;
 
 namespace Avalonia.Controls.Presenters
 {
     /// <summary>
     /// Presents a single item of data inside a <see cref="TemplatedControl"/> template.
     /// </summary>
-    [PseudoClasses(":empty")]
     public class ContentPresenter : Control, IContentPresenter
     {
         /// <summary>
         /// Defines the <see cref="Background"/> property.
         /// </summary>
-        public static readonly StyledProperty<IBrush?> BackgroundProperty =
+        public static readonly StyledProperty<IBrush> BackgroundProperty =
             Border.BackgroundProperty.AddOwner<ContentPresenter>();
 
         /// <summary>
         /// Defines the <see cref="BorderBrush"/> property.
         /// </summary>
-        public static readonly StyledProperty<IBrush?> BorderBrushProperty =
+        public static readonly AvaloniaProperty<IBrush> BorderBrushProperty =
             Border.BorderBrushProperty.AddOwner<ContentPresenter>();
 
         /// <summary>
         /// Defines the <see cref="BorderThickness"/> property.
         /// </summary>
-        public static readonly StyledProperty<Thickness> BorderThicknessProperty =
+        public static readonly StyledProperty<double> BorderThicknessProperty =
             Border.BorderThicknessProperty.AddOwner<ContentPresenter>();
 
         /// <summary>
-        /// Defines the <see cref="CornerRadius"/> property.
-        /// </summary>
-        public static readonly StyledProperty<CornerRadius> CornerRadiusProperty =
-            Border.CornerRadiusProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="BoxShadow"/> property.
-        /// </summary>
-        public static readonly StyledProperty<BoxShadows> BoxShadowProperty =
-            Border.BoxShadowProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="Foreground"/> property.
-        /// </summary>
-        public static readonly StyledProperty<IBrush?> ForegroundProperty =
-            TextElement.ForegroundProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="FontFamily"/> property.
-        /// </summary>
-        public static readonly StyledProperty<FontFamily> FontFamilyProperty =
-            TextElement.FontFamilyProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="FontSize"/> property.
-        /// </summary>
-        public static readonly StyledProperty<double> FontSizeProperty =
-            TextElement.FontSizeProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="FontStyle"/> property.
-        /// </summary>
-        public static readonly StyledProperty<FontStyle> FontStyleProperty =
-            TextElement.FontStyleProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="FontWeight"/> property.
-        /// </summary>
-        public static readonly StyledProperty<FontWeight> FontWeightProperty =
-            TextElement.FontWeightProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="FontStretch"/> property.
-        /// </summary>
-        public static readonly StyledProperty<FontStretch> FontStretchProperty =
-            TextElement.FontStretchProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="TextAlignment"/> property
-        /// </summary>
-        public static readonly StyledProperty<TextAlignment> TextAlignmentProperty =
-            TextBlock.TextAlignmentProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="TextWrapping"/> property
-        /// </summary>
-        public static readonly StyledProperty<TextWrapping> TextWrappingProperty =
-            TextBlock.TextWrappingProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="TextTrimming"/> property
-        /// </summary>
-        public static readonly StyledProperty<TextTrimming> TextTrimmingProperty =
-            TextBlock.TextTrimmingProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="LineHeight"/> property
-        /// </summary>
-        public static readonly StyledProperty<double> LineHeightProperty =
-            TextBlock.LineHeightProperty.AddOwner<ContentPresenter>();
-
-        /// <summary>
-        /// Defines the <see cref="MaxLines"/> property
-        /// </summary>
-        public static readonly StyledProperty<int> MaxLinesProperty =
-            TextBlock.MaxLinesProperty.AddOwner<ContentPresenter>();
-                
-        /// <summary>
         /// Defines the <see cref="Child"/> property.
         /// </summary>
-        public static readonly DirectProperty<ContentPresenter, IControl?> ChildProperty =
-            AvaloniaProperty.RegisterDirect<ContentPresenter, IControl?>(
+        public static readonly DirectProperty<ContentPresenter, IControl> ChildProperty =
+            AvaloniaProperty.RegisterDirect<ContentPresenter, IControl>(
                 nameof(Child),
                 o => o.Child);
 
         /// <summary>
         /// Defines the <see cref="Content"/> property.
         /// </summary>
-        public static readonly StyledProperty<object?> ContentProperty =
+        public static readonly StyledProperty<object> ContentProperty =
             ContentControl.ContentProperty.AddOwner<ContentPresenter>();
 
         /// <summary>
         /// Defines the <see cref="ContentTemplate"/> property.
         /// </summary>
-        public static readonly StyledProperty<IDataTemplate?> ContentTemplateProperty =
+        public static readonly StyledProperty<IDataTemplate> ContentTemplateProperty =
             ContentControl.ContentTemplateProperty.AddOwner<ContentPresenter>();
+
+        /// <summary>
+        /// Defines the <see cref="CornerRadius"/> property.
+        /// </summary>
+        public static readonly StyledProperty<float> CornerRadiusProperty =
+            Border.CornerRadiusProperty.AddOwner<ContentPresenter>();
 
         /// <summary>
         /// Defines the <see cref="HorizontalContentAlignment"/> property.
@@ -151,41 +76,32 @@ namespace Avalonia.Controls.Presenters
         /// Defines the <see cref="Padding"/> property.
         /// </summary>
         public static readonly StyledProperty<Thickness> PaddingProperty =
-            Decorator.PaddingProperty.AddOwner<ContentPresenter>();
+            Border.PaddingProperty.AddOwner<ContentPresenter>();
 
-        /// <summary>
-        /// Defines the <see cref="RecognizesAccessKey"/> property
-        /// </summary>
-        public static readonly DirectProperty<ContentPresenter, bool> RecognizesAccessKeyProperty =
-            AvaloniaProperty.RegisterDirect<ContentPresenter, bool>(
-                nameof(RecognizesAccessKey),
-                cp => cp.RecognizesAccessKey, (cp, value) => cp.RecognizesAccessKey = value);
-
-        private IControl? _child;
+        private IControl _child;
         private bool _createdChild;
-        private IRecyclingDataTemplate? _recyclingDataTemplate;
-        private readonly BorderRenderHelper _borderRenderer = new BorderRenderHelper();
-        private bool _recognizesAccessKey;
+        private IDataTemplate _dataTemplate;
 
         /// <summary>
         /// Initializes static members of the <see cref="ContentPresenter"/> class.
         /// </summary>
         static ContentPresenter()
         {
-            AffectsRender<ContentPresenter>(BackgroundProperty, BorderBrushProperty, BorderThicknessProperty, CornerRadiusProperty);
-            AffectsArrange<ContentPresenter>(HorizontalContentAlignmentProperty, VerticalContentAlignmentProperty);
-            AffectsMeasure<ContentPresenter>(BorderThicknessProperty, PaddingProperty);
+            ContentProperty.Changed.AddClassHandler<ContentPresenter>(x => x.ContentChanged);
+            TemplatedParentProperty.Changed.AddClassHandler<ContentPresenter>(x => x.TemplatedParentChanged);
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ContentPresenter"/> class.
+        /// </summary>
         public ContentPresenter()
         {
-            UpdatePseudoClasses();
         }
 
         /// <summary>
         /// Gets or sets a brush with which to paint the background.
         /// </summary>
-        public IBrush? Background
+        public IBrush Background
         {
             get { return GetValue(BackgroundProperty); }
             set { SetValue(BackgroundProperty, value); }
@@ -194,7 +110,7 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Gets or sets a brush with which to paint the border.
         /// </summary>
-        public IBrush? BorderBrush
+        public IBrush BorderBrush
         {
             get { return GetValue(BorderBrushProperty); }
             set { SetValue(BorderBrushProperty, value); }
@@ -203,133 +119,16 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Gets or sets the thickness of the border.
         /// </summary>
-        public Thickness BorderThickness
+        public double BorderThickness
         {
             get { return GetValue(BorderThicknessProperty); }
             set { SetValue(BorderThicknessProperty, value); }
         }
 
         /// <summary>
-        /// Gets or sets the radius of the border rounded corners.
-        /// </summary>
-        public CornerRadius CornerRadius
-        {
-            get { return GetValue(CornerRadiusProperty); }
-            set { SetValue(CornerRadiusProperty, value); }
-        }
-
-        /// <summary>
-        /// Gets or sets the box shadow effect parameters
-        /// </summary>
-        public BoxShadows BoxShadow
-        {
-            get => GetValue(BoxShadowProperty);
-            set => SetValue(BoxShadowProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets a brush used to paint the text.
-        /// </summary>
-        public IBrush? Foreground
-        {
-            get => GetValue(ForegroundProperty);
-            set => SetValue(ForegroundProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the font family.
-        /// </summary>
-        public FontFamily FontFamily
-        {
-            get => GetValue(FontFamilyProperty);
-            set => SetValue(FontFamilyProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the font size.
-        /// </summary>
-        public double FontSize
-        {
-            get => GetValue(FontSizeProperty);
-            set => SetValue(FontSizeProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the font style.
-        /// </summary>
-        public FontStyle FontStyle
-        {
-            get => GetValue(FontStyleProperty);
-            set => SetValue(FontStyleProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the font weight.
-        /// </summary>
-        public FontWeight FontWeight
-        {
-            get => GetValue(FontWeightProperty);
-            set => SetValue(FontWeightProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the font stretch.
-        /// </summary>
-        public FontStretch FontStretch
-        {
-            get => GetValue(FontStretchProperty);
-            set => SetValue(FontStretchProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the text alignment
-        /// </summary>
-        public TextAlignment TextAlignment
-        {
-            get => GetValue(TextAlignmentProperty);
-            set => SetValue(TextAlignmentProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the text wrapping
-        /// </summary>
-        public TextWrapping TextWrapping
-        {
-            get => GetValue(TextWrappingProperty);
-            set => SetValue(TextWrappingProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the text trimming
-        /// </summary>
-        public TextTrimming TextTrimming
-        {
-            get => GetValue(TextTrimmingProperty);
-            set => SetValue(TextTrimmingProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the line height
-        /// </summary>
-        public double LineHeight
-        {
-            get => GetValue(LineHeightProperty);
-            set => SetValue(LineHeightProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the max lines
-        /// </summary>
-        public int MaxLines
-        {
-            get => GetValue(MaxLinesProperty);
-            set => SetValue(MaxLinesProperty, value);
-        }
-
-        /// <summary>
         /// Gets the control displayed by the presenter.
         /// </summary>
-        public IControl? Child
+        public IControl Child
         {
             get { return _child; }
             private set { SetAndRaise(ChildProperty, ref _child, value); }
@@ -338,8 +137,7 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Gets or sets the content to be displayed by the presenter.
         /// </summary>
-        [DependsOn(nameof(ContentTemplate))]
-        public object? Content
+        public object Content
         {
             get { return GetValue(ContentProperty); }
             set { SetValue(ContentProperty, value); }
@@ -348,14 +146,23 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Gets or sets the data template used to display the content of the control.
         /// </summary>
-        public IDataTemplate? ContentTemplate
+        public IDataTemplate ContentTemplate
         {
             get { return GetValue(ContentTemplateProperty); }
             set { SetValue(ContentTemplateProperty, value); }
         }
 
         /// <summary>
-        /// Gets or sets the horizontal alignment of the content within the border the control.
+        /// Gets or sets the radius of the border rounded corners.
+        /// </summary>
+        public float CornerRadius
+        {
+            get { return GetValue(CornerRadiusProperty); }
+            set { SetValue(CornerRadiusProperty, value); }
+        }
+
+        /// <summary>
+        /// Gets or sets the horizontal alignment of the content within the control.
         /// </summary>
         public HorizontalAlignment HorizontalContentAlignment
         {
@@ -364,7 +171,7 @@ namespace Avalonia.Controls.Presenters
         }
 
         /// <summary>
-        /// Gets or sets the vertical alignment of the content within the border of the control.
+        /// Gets or sets the vertical alignment of the content within the control.
         /// </summary>
         public VerticalAlignment VerticalContentAlignment
         {
@@ -373,7 +180,7 @@ namespace Avalonia.Controls.Presenters
         }
 
         /// <summary>
-        /// Gets or sets the space between the border and the <see cref="Child"/> control.
+        /// Gets or sets the padding to place around the <see cref="Child"/> control.
         /// </summary>
         public Thickness Padding
         {
@@ -381,22 +188,8 @@ namespace Avalonia.Controls.Presenters
             set { SetValue(PaddingProperty, value); }
         }
 
-        /// <summary>
-        /// Determine if <see cref="ContentPresenter"/> should use <see cref="AccessText"/> in its style
-        /// </summary>
-        public bool RecognizesAccessKey
-        {
-            get => _recognizesAccessKey;
-            set => SetAndRaise(RecognizesAccessKeyProperty, ref _recognizesAccessKey, value);
-        }
-
-        /// <summary>
-        /// Gets the host content control.
-        /// </summary>
-        internal IContentPresenterHost? Host { get; private set; }
-
         /// <inheritdoc/>
-        public sealed override void ApplyTemplate()
+        public override sealed void ApplyTemplate()
         {
             if (!_createdChild && ((ILogical)this).IsAttachedToLogicalTree)
             {
@@ -404,23 +197,11 @@ namespace Avalonia.Controls.Presenters
             }
         }
 
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        /// <inheritdoc/>
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
-            base.OnPropertyChanged(change);
-            switch (change.Property.Name)
-            {
-                case nameof(Content):
-                case nameof(ContentTemplate):
-                    ContentChanged(change);
-                    break;
-                case nameof(TemplatedParent):
-                    TemplatedParentChanged(change);
-                    break;
-                case nameof(UseLayoutRounding):
-                case nameof(BorderThickness):
-                    _layoutThickness = null;
-                    break;
-            }
+            base.OnAttachedToVisualTree(e);
+            _dataTemplate = null;
         }
 
         /// <summary>
@@ -437,30 +218,17 @@ namespace Avalonia.Controls.Presenters
         public void UpdateChild()
         {
             var content = Content;
-            UpdateChild(content);
-        }
-
-        private void UpdateChild(object? content)
-        {
-            var contentTemplate = ContentTemplate;
             var oldChild = Child;
-            var newChild = CreateChild(content, oldChild, contentTemplate);
-            var logicalChildren = Host?.LogicalChildren ?? LogicalChildren;
+            var newChild = CreateChild();            
 
             // Remove the old child if we're not recycling it.
-            if (newChild != oldChild)
+            if (oldChild != null && newChild != oldChild)
             {
-
-                if (oldChild != null)
-                {
-                    VisualChildren.Remove(oldChild);
-                    logicalChildren.Remove(oldChild);
-                    ((ISetInheritanceParent)oldChild).SetParent(oldChild.Parent);
-                }
+                VisualChildren.Remove(oldChild);
             }
 
             // Set the DataContext if the data isn't a control.
-            if (contentTemplate is { } || !(content is IControl))
+            if (!(content is IControl))
             {
                 DataContext = content;
             }
@@ -477,112 +245,103 @@ namespace Avalonia.Controls.Presenters
             else if (newChild != oldChild)
             {
                 ((ISetInheritanceParent)newChild).SetParent(this);
+
                 Child = newChild;
 
-                if (!logicalChildren.Contains(newChild))
+                if (oldChild?.Parent == this)
                 {
-                    logicalChildren.Add(newChild);
+                    LogicalChildren.Remove(oldChild);
+                }
+
+                if (newChild.Parent == null)
+                {
+                    var templatedLogicalParent = TemplatedParent as ILogical;
+
+                    if (templatedLogicalParent != null)
+                    {
+                        ((ISetLogicalParent)newChild).SetParent(templatedLogicalParent);
+                    }
+                    else
+                    {
+                        LogicalChildren.Add(newChild);
+                    }
                 }
 
                 VisualChildren.Add(newChild);
             }
 
             _createdChild = true;
-
         }
 
         /// <inheritdoc/>
         protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
         {
             base.OnAttachedToLogicalTree(e);
-            _recyclingDataTemplate = null;
             _createdChild = false;
             InvalidateMeasure();
-        }
-
-        private Thickness? _layoutThickness;
-        private double _scale;
-
-        private Thickness LayoutThickness
-        {
-            get
-            {
-                VerifyScale();
-
-                if (_layoutThickness == null)
-                {
-                    var borderThickness = BorderThickness;
-
-                    if (UseLayoutRounding)
-                        borderThickness = LayoutHelper.RoundLayoutThickness(borderThickness, _scale, _scale);
-
-                    _layoutThickness = borderThickness;
-                }
-
-                return _layoutThickness.Value;
-            }
-        }
-
-        private void VerifyScale()
-        {
-            var currentScale = LayoutHelper.GetLayoutScale(this);
-            if (MathUtilities.AreClose(currentScale, _scale))
-                return;
-
-            _scale = currentScale;
-            _layoutThickness = null;
         }
 
         /// <inheritdoc/>
         public override void Render(DrawingContext context)
         {
-            _borderRenderer.Render(context, Bounds.Size, LayoutThickness, CornerRadius, Background, BorderBrush,
-                BoxShadow);
+            var background = Background;
+            var borderBrush = BorderBrush;
+            var borderThickness = BorderThickness;
+            var cornerRadius = CornerRadius;
+            var rect = new Rect(Bounds.Size).Deflate(BorderThickness);
+
+            if (background != null)
+            {
+                context.FillRectangle(background, rect, cornerRadius);
+            }
+
+            if (borderBrush != null && borderThickness > 0)
+            {
+                context.DrawRectangle(new Pen(borderBrush, borderThickness), rect, cornerRadius);
+            }
         }
 
         /// <summary>
         /// Creates the child control.
         /// </summary>
         /// <returns>The child control or null.</returns>
-        protected virtual IControl? CreateChild()
+        protected virtual IControl CreateChild()
         {
             var content = Content;
             var oldChild = Child;
-            return CreateChild(content, oldChild, ContentTemplate);
-        }
-
-        private IControl? CreateChild(object? content, IControl? oldChild, IDataTemplate? template)
-        {            
             var newChild = content as IControl;
 
-            // We want to allow creating Child from the Template, if Content is null.
-            // But it's important to not use DataTemplates, otherwise we will break content presenters in many places,
-            // otherwise it will blow up every ContentPresenter without Content set.
-            if ((newChild == null 
-                && (content != null || template != null)) || (newChild is { } && template is { }))
+            if (content != null && newChild == null)
             {
-                var dataTemplate = this.FindDataTemplate(content, template) ??
-                    (
-                        RecognizesAccessKey
-                            ? FuncDataTemplate.Access
-                            : FuncDataTemplate.Default
-                    );
-
-                if (dataTemplate is IRecyclingDataTemplate rdt)
+                // We have content and it isn't a control, so first try to recycle the existing
+                // child control to display the new data by querying if the template that created
+                // the child can recycle items and that it also matches the new data.
+                if (oldChild != null &&
+                    _dataTemplate != null &&
+                    _dataTemplate.SupportsRecycling &&
+                    _dataTemplate.Match(content))
                 {
-                    var toRecycle = rdt == _recyclingDataTemplate ? oldChild : null;
-                    newChild = rdt.Build(content, toRecycle);
-                    _recyclingDataTemplate = rdt;
+                    newChild = oldChild;
                 }
                 else
                 {
-                    newChild = dataTemplate.Build(content);
-                    _recyclingDataTemplate = null;
+                    // We couldn't recycle an existing control so find a data template for the data
+                    // and use it to create a control.
+                    _dataTemplate = this.FindDataTemplate(content, ContentTemplate) ?? FuncDataTemplate.Default;
+                    newChild = _dataTemplate.Build(content);
+
+                    // Try to give the new control its own name scope.
+                    var controlResult = newChild as Control;
+
+                    if (controlResult != null)
+                    {
+                        NameScope.SetNameScope(controlResult, new NameScope());
+                    }
                 }
             }
             else
             {
-                _recyclingDataTemplate = null;
+                _dataTemplate = null;
             }
 
             return newChild;
@@ -591,84 +350,69 @@ namespace Avalonia.Controls.Presenters
         /// <inheritdoc/>
         protected override Size MeasureOverride(Size availableSize)
         {
-            return LayoutHelper.MeasureChild(Child, availableSize, Padding, BorderThickness);
+            var child = Child;
+            var padding = Padding + new Thickness(BorderThickness);
+
+            if (child != null)
+            {
+                child.Measure(availableSize.Deflate(padding));
+                return child.DesiredSize.Inflate(padding);
+            }
+            else
+            {
+                return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
+            }
         }
 
         /// <inheritdoc/>
         protected override Size ArrangeOverride(Size finalSize)
         {
-            return ArrangeOverrideImpl(finalSize, new Vector());
-        }
+            var child = Child;
 
-        internal Size ArrangeOverrideImpl(Size finalSize, Vector offset)
-        {
-            if (Child == null) return finalSize;
-
-            var useLayoutRounding = UseLayoutRounding;
-            var scale = LayoutHelper.GetLayoutScale(this);
-            var padding = Padding;
-            var borderThickness = BorderThickness;
-
-            if (useLayoutRounding)
+            if (child != null)
             {
-                padding = LayoutHelper.RoundLayoutThickness(padding, scale, scale);
-                borderThickness = LayoutHelper.RoundLayoutThickness(borderThickness, scale, scale);
+                var padding = Padding + new Thickness(BorderThickness);
+                var sizeMinusPadding = finalSize.Deflate(padding);
+                var size = sizeMinusPadding;
+                var horizontalAlignment = HorizontalContentAlignment;
+                var verticalAlignment = VerticalContentAlignment;
+                var originX = padding.Left;
+                var originY = padding.Top;
+
+                if (horizontalAlignment != HorizontalAlignment.Stretch)
+                {
+                    size = size.WithWidth(child.DesiredSize.Width);
+                }
+
+                if (verticalAlignment != VerticalAlignment.Stretch)
+                {
+                    size = size.WithHeight(child.DesiredSize.Height);
+                }
+
+                switch (horizontalAlignment)
+                {
+                    case HorizontalAlignment.Stretch:
+                    case HorizontalAlignment.Center:
+                        originX += (sizeMinusPadding.Width - size.Width) / 2;
+                        break;
+                    case HorizontalAlignment.Right:
+                        originX = size.Width - child.DesiredSize.Width;
+                        break;
+                }
+
+                switch (verticalAlignment)
+                {
+                    case VerticalAlignment.Stretch:
+                    case VerticalAlignment.Center:
+                        originY += (sizeMinusPadding.Height - size.Height) / 2;
+                        break;
+                    case VerticalAlignment.Bottom:
+                        originY = size.Height - child.DesiredSize.Height;
+                        break;
+                }
+
+                child.Arrange(new Rect(originX, originY, size.Width, size.Height));
             }
-
-            padding += borderThickness;
-            var horizontalContentAlignment = HorizontalContentAlignment;
-            var verticalContentAlignment = VerticalContentAlignment;
-            var availableSize = finalSize;
-            var sizeForChild = availableSize;
-            var originX = offset.X;
-            var originY = offset.Y;
-
-            if (horizontalContentAlignment != HorizontalAlignment.Stretch)
-            {
-                sizeForChild = sizeForChild.WithWidth(Math.Min(sizeForChild.Width, DesiredSize.Width));
-            }
-
-            if (verticalContentAlignment != VerticalAlignment.Stretch)
-            {
-                sizeForChild = sizeForChild.WithHeight(Math.Min(sizeForChild.Height, DesiredSize.Height));
-            }
-
-            if (useLayoutRounding)
-            {
-                sizeForChild = LayoutHelper.RoundLayoutSizeUp(sizeForChild, scale, scale);
-                availableSize = LayoutHelper.RoundLayoutSizeUp(availableSize, scale, scale);
-            }
-
-            switch (horizontalContentAlignment)
-            {
-                case HorizontalAlignment.Center:
-                    originX += (availableSize.Width - sizeForChild.Width) / 2;
-                    break;
-                case HorizontalAlignment.Right:
-                    originX += availableSize.Width - sizeForChild.Width;
-                    break;
-            }
-
-            switch (verticalContentAlignment)
-            {
-                case VerticalAlignment.Center:
-                    originY += (availableSize.Height - sizeForChild.Height) / 2;
-                    break;
-                case VerticalAlignment.Bottom:
-                    originY += availableSize.Height - sizeForChild.Height;
-                    break;
-            }
-
-            if (useLayoutRounding)
-            {
-                originX = LayoutHelper.RoundLayoutValue(originX, scale);
-                originY = LayoutHelper.RoundLayoutValue(originY, scale);
-            }
-
-            var boundsForChild =
-                new Rect(originX, originY, sizeForChild.Width, sizeForChild.Height).Deflate(padding);
-
-            Child.Arrange(boundsForChild);
 
             return finalSize;
         }
@@ -680,40 +424,12 @@ namespace Avalonia.Controls.Presenters
         private void ContentChanged(AvaloniaPropertyChangedEventArgs e)
         {
             _createdChild = false;
-
-            if (((ILogical)this).IsAttachedToLogicalTree)
-            {
-                if (e.Property.Name == nameof(Content))
-                {
-                    UpdateChild(e.NewValue);
-                }
-                else
-                {
-                    UpdateChild();
-                }
-            }
-            else if (Child != null)
-            {
-                VisualChildren.Remove(Child);
-                LogicalChildren.Remove(Child);
-                ((ISetInheritanceParent)Child).SetParent(Child.Parent);
-                Child = null;
-                _recyclingDataTemplate = null;
-            }
-
-            UpdatePseudoClasses();
             InvalidateMeasure();
-        }
-
-        private void UpdatePseudoClasses()
-        {
-            PseudoClasses.Set(":empty", Content is null);
         }
 
         private void TemplatedParentChanged(AvaloniaPropertyChangedEventArgs e)
         {
-            var host = e.NewValue as IContentPresenterHost;
-            Host = host?.RegisterContentPresenter(this) == true ? host : null;
+            (e.NewValue as IContentPresenterHost)?.RegisterContentPresenter(this);
         }
     }
 }

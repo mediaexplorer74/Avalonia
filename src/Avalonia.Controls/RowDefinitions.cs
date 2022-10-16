@@ -1,17 +1,23 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System.Globalization;
 using System.Linq;
+using Avalonia.Collections;
 
 namespace Avalonia.Controls
 {
     /// <summary>
     /// A collection of <see cref="RowDefinition"/>s.
     /// </summary>
-    public class RowDefinitions : DefinitionList<RowDefinition>
+    public class RowDefinitions : AvaloniaList<RowDefinition>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="RowDefinitions"/> class.
         /// </summary>
-        public RowDefinitions() : base()
+        public RowDefinitions()
         {
+            ResetBehavior = ResetBehavior.Remove;
         }
 
         /// <summary>
@@ -21,19 +27,7 @@ namespace Avalonia.Controls
         public RowDefinitions(string s)
             : this()
         {
-            AddRange(GridLength.ParseLengths(s).Select(x => new RowDefinition(x)));
+            AddRange(GridLength.ParseLengths(s, CultureInfo.InvariantCulture).Select(x => new RowDefinition(x)));
         }
-
-        public override string ToString()
-        {
-            return string.Join(",", this.Select(x => x.Height));
-        }
-
-        /// <summary>
-        /// Parses a string representation of row definitions collection.
-        /// </summary>
-        /// <param name="s">The row definitions string.</param>
-        /// <returns>The <see cref="RowDefinitions"/>.</returns>
-        public static RowDefinitions Parse(string s) => new RowDefinitions(s);
     }
 }

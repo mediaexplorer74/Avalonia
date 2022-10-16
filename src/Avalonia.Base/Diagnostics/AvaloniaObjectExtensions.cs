@@ -1,4 +1,6 @@
-using System;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Data;
 
 namespace Avalonia.Diagnostics
@@ -19,7 +21,26 @@ namespace Avalonia.Diagnostics
         /// </returns>
         public static AvaloniaPropertyValue GetDiagnostic(this AvaloniaObject o, AvaloniaProperty property)
         {
-            return o.GetDiagnosticInternal(property);
+            var set = o.GetSetValues();
+
+            PriorityValue value;
+
+            if (set.TryGetValue(property, out value))
+            {
+                return new AvaloniaPropertyValue(
+                    property,
+                    o.GetValue(property),
+                    (BindingPriority)value.ValuePriority,
+                    value.GetDiagnostic());
+            }
+            else
+            {
+                return new AvaloniaPropertyValue(
+                    property,
+                    o.GetValue(property),
+                    BindingPriority.Unset,
+                    "Unset");
+            }
         }
     }
 }

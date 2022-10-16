@@ -1,45 +1,34 @@
-using Avalonia.Styling;
-using System;
-using Avalonia.Controls;
-using System.Collections.Generic;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
 
-#nullable enable
+using System;
+using Avalonia.Styling;
 
 namespace Avalonia.Markup.Xaml.Styling
 {
     /// <summary>
     /// Includes a style from a URL.
     /// </summary>
-    public class StyleInclude : IStyle, IResourceProvider
+    public class StyleInclude : IStyle
     {
-        private readonly Uri _baseUri;
-        private IStyle[]? _loaded;
-        private bool _isLoading;
+        private Uri _baseUri;
+        private IStyle _loaded;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StyleInclude"/> class.
         /// </summary>
-        /// <param name="baseUri">The base URL for the XAML context.</param>
-        public StyleInclude(Uri baseUri)
+        public StyleInclude()
         {
-            _baseUri = baseUri;
+            // StyleInclude will usually be loaded from XAML and its URI can be relative to the
+            // XAML file that its included in, so store the current XAML file's URI if any as
+            // a base URI.
+            _baseUri = AvaloniaXamlLoader.UriContext;
         }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="StyleInclude"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The XAML service provider.</param>
-        public StyleInclude(IServiceProvider serviceProvider)
-        {
-            _baseUri = serviceProvider.GetContextBaseUri();
-        }
-
-        public IResourceHost? Owner => (Loaded as IResourceProvider)?.Owner;
 
         /// <summary>
         /// Gets or sets the source URL.
         /// </summary>
-        public Uri? Source { get; set; }
+        public Uri Source { get; set; }
 
         /// <summary>
         /// Gets the loaded style.
@@ -50,52 +39,33 @@ namespace Avalonia.Markup.Xaml.Styling
             {
                 if (_loaded == null)
                 {
-                    _isLoading = true;
-                    var loaded = (IStyle)AvaloniaXamlLoader.Load(Source, _baseUri);
-                    _loaded = new[] { loaded };
-                    _isLoading = false;
+                    var loader = new AvaloniaXamlLoader();
+                    _loaded = (IStyle)loader.Load(Source, _baseUri);
                 }
 
-                return _loaded?[0]!;
+                return _loaded;
             }
         }
 
-        bool IResourceNode.HasResources => Loaded?.HasResources ?? false;
-
-        IReadOnlyList<IStyle> IStyle.Children => _loaded ?? Array.Empty<IStyle>();
-
-        public event EventHandler? OwnerChanged
+        /// <inheritdoc/>
+        public void Attach(IStyleable control, IStyleHost container)
         {
-            add
+            if (Source != null)
             {
-                if (Loaded is IResourceProvider rp)
-                {
-                    rp.OwnerChanged += value;
-                }
-            }
-            remove
-            {
-                if (Loaded is IResourceProvider rp)
-                {
-                    rp.OwnerChanged -= value;
-                }
+                Loaded.Attach(control, container);
             }
         }
 
-        public SelectorMatchResult TryAttach(IStyleable target, object? host) => Loaded.TryAttach(target, host);
-
-        public bool TryGetResource(object key, out object? value)
+        /// <summary>
+        /// Tries to find a named resource within the style.
+        /// </summary>
+        /// <param name="name">The resource name.</param>
+        /// <returns>
+        /// The resource if found, otherwise <see cref="AvaloniaProperty.UnsetValue"/>.
+        /// </returns>
+        public object FindResource(string name)
         {
-            if (!_isLoading)
-            {
-                return Loaded.TryGetResource(key, out value);
-            }
-
-            value = null;
-            return false;
+            return Loaded.FindResource(name);
         }
-
-        void IResourceProvider.AddOwner(IResourceHost owner) => (Loaded as IResourceProvider)?.AddOwner(owner);
-        void IResourceProvider.RemoveOwner(IResourceHost owner) => (Loaded as IResourceProvider)?.RemoveOwner(owner);
     }
 }

@@ -1,9 +1,10 @@
 ﻿using System;
-using System.ComponentModel;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
-using Avalonia.Automation.Peers;
+using System.Text;
+using System.Threading.Tasks;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -28,60 +29,44 @@ namespace Avalonia.Controls
         public static readonly DirectProperty<WindowBase, bool> IsActiveProperty =
             AvaloniaProperty.RegisterDirect<WindowBase, bool>(nameof(IsActive), o => o.IsActive);
 
-        /// <summary>
-        /// Defines the <see cref="Owner"/> property.
-        /// </summary>
-        public static readonly DirectProperty<WindowBase, WindowBase?> OwnerProperty =
-            AvaloniaProperty.RegisterDirect<WindowBase, WindowBase?>(
-                nameof(Owner),
-                o => o.Owner,
-                (o, v) => o.Owner = v);
-
-        public static readonly StyledProperty<bool> TopmostProperty =
-            AvaloniaProperty.Register<WindowBase, bool>(nameof(Topmost));
-
-        private bool _hasExecutedInitialLayoutPass;
         private bool _isActive;
         private bool _ignoreVisibilityChange;
-        private WindowBase? _owner;
 
         static WindowBase()
         {
             IsVisibleProperty.OverrideDefaultValue<WindowBase>(false);
-            IsVisibleProperty.Changed.AddClassHandler<WindowBase>((x,e) => x.IsVisibleChanged(e));
-
-            
-            TopmostProperty.Changed.AddClassHandler<WindowBase>((w, e) => w.PlatformImpl?.SetTopmost((bool)e.NewValue!));
+            IsVisibleProperty.Changed.AddClassHandler<WindowBase>(x => x.IsVisibleChanged);
         }
 
         public WindowBase(IWindowBaseImpl impl) : this(impl, AvaloniaLocator.Current)
         {
         }
 
-        public WindowBase(IWindowBaseImpl impl, IAvaloniaDependencyResolver? dependencyResolver) : base(impl, dependencyResolver)
+        public WindowBase(IWindowBaseImpl impl, IAvaloniaDependencyResolver dependencyResolver) : base(impl, dependencyResolver)
         {
-            Screens = new Screens(impl.Screen);
             impl.Activated = HandleActivated;
             impl.Deactivated = HandleDeactivated;
             impl.PositionChanged = HandlePositionChanged;
+            this.GetObservable(ClientSizeProperty).Skip(1).Subscribe(x => PlatformImpl?.Resize(x));
         }
 
         /// <summary>
         /// Fired when the window is activated.
         /// </summary>
-        public event EventHandler? Activated;
+        public event EventHandler Activated;
 
         /// <summary>
         /// Fired when the window is deactivated.
         /// </summary>
-        public event EventHandler? Deactivated;
+        public event EventHandler Deactivated;
 
         /// <summary>
         /// Fired when the window position is changed.
         /// </summary>
-        public event EventHandler<PixelPointEventArgs>? PositionChanged;
+        public event EventHandler<PointEventArgs> PositionChanged;
 
-        public new IWindowBaseImpl? PlatformImpl => (IWindowBaseImpl?) base.PlatformImpl;
+        [CanBeNull]
+        public new IWindowBaseImpl PlatformImpl => (IWindowBaseImpl) base.PlatformImpl;
 
         /// <summary>
         /// Gets a value that indicates whether the window is active.
@@ -91,25 +76,27 @@ namespace Avalonia.Controls
             get { return _isActive; }
             private set { SetAndRaise(IsActiveProperty, ref _isActive, value); }
         }
-        
-        public Screens Screens { get; private set; }
 
         /// <summary>
-        /// Gets or sets the owner of the window.
+        /// Gets or sets the window position in screen coordinates.
         /// </summary>
-        public WindowBase? Owner
+        public Point Position
         {
-            get { return _owner; }
-            protected set { SetAndRaise(OwnerProperty, ref _owner, value); }
+            get { return PlatformImpl?.Position ?? default(Point); }
+            set
+            {
+                if (PlatformImpl is IWindowBaseImpl impl)
+                    impl.Position = value;
+            }
         }
 
         /// <summary>
-        /// Gets or sets whether this window appears on top of all other windows
+        /// Whether an auto-size operation is in progress.
         /// </summary>
-        public bool Topmost
+        protected bool AutoSizing
         {
-            get { return GetValue(TopmostProperty); }
-            set { SetValue(TopmostProperty, value); }
+            get;
+            private set;
         }
 
         /// <summary>
@@ -129,7 +116,6 @@ namespace Avalonia.Controls
 
             try
             {
-                Renderer?.Stop();
                 PlatformImpl?.Hide();
                 IsVisible = false;
             }
@@ -140,7 +126,7 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Shows the window.
+        /// Shows the popup.
         /// </summary>
         public virtual void Show()
         {
@@ -150,20 +136,43 @@ namespace Avalonia.Controls
             {
                 EnsureInitialized();
                 IsVisible = true;
-
-                if (!_hasExecutedInitialLayoutPass)
-                {
-                    LayoutManager.ExecuteInitialLayoutPass();
-                    _hasExecutedInitialLayoutPass = true;
-                }
-                PlatformImpl?.Show(true, false);
-                Renderer?.Start();
-                OnOpened(EventArgs.Empty);
+                LayoutManager.Instance.ExecuteInitialLayoutPass(this);
+                PlatformImpl?.Show();
             }
             finally
             {
                 _ignoreVisibilityChange = false;
             }
+        }
+
+        /// <summary>
+        /// Begins an auto-resize operation.
+        /// </summary>
+        /// <returns>A disposable used to finish the operation.</returns>
+        /// <remarks>
+        /// When an auto-resize operation is in progress any resize events received will not be
+        /// cause the new size to be written to the <see cref="Layoutable.Width"/> and
+        /// <see cref="Layoutable.Height"/> properties.
+        /// </remarks>
+        protected IDisposable BeginAutoSizing()
+        {
+            AutoSizing = true;
+            return Disposable.Create(() => AutoSizing = false);
+        }
+
+        /// <summary>
+        /// Carries out the arrange pass of the window.
+        /// </summary>
+        /// <param name="finalSize">The final window size.</param>
+        /// <returns>The <paramref name="finalSize"/> parameter unchanged.</returns>
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            using (BeginAutoSizing())
+            {
+                PlatformImpl?.Resize(finalSize);
+            }
+
+            return base.ArrangeOverride(PlatformImpl?.ClientSize ?? default(Size));
         }
 
         /// <summary>
@@ -179,26 +188,6 @@ namespace Avalonia.Controls
             }
         }
 
-        /// <inheritdoc/>
-        protected override void OnClosed(EventArgs e)
-        {
-            // Window must manually raise Loaded/Unloaded events as it is a visual root and
-            // does not raise OnAttachedToVisualTreeCore/OnDetachedFromVisualTreeCore events
-            OnUnloadedCore();
-
-            base.OnClosed(e);
-        }
-
-        /// <inheritdoc/>
-        protected override void OnOpened(EventArgs e)
-        {
-            // Window must manually raise Loaded/Unloaded events as it is a visual root and
-            // does not raise OnAttachedToVisualTreeCore/OnDetachedFromVisualTreeCore events
-            ScheduleOnLoadedCore();
-
-            base.OnOpened(e);
-        }
-
         protected override void HandleClosed()
         {
             _ignoreVisibilityChange = true;
@@ -206,12 +195,6 @@ namespace Avalonia.Controls
             try
             {
                 IsVisible = false;
-                
-                if (this is IFocusScope scope)
-                {
-                    FocusManager.Instance?.RemoveFocusScope(scope);
-                }
-                
                 base.HandleClosed();
             }
             finally
@@ -224,70 +207,26 @@ namespace Avalonia.Controls
         /// Handles a resize notification from <see cref="ITopLevelImpl.Resized"/>.
         /// </summary>
         /// <param name="clientSize">The new client size.</param>
-        /// <param name="reason">The reason for the resize.</param>
-        protected override void HandleResized(Size clientSize, PlatformResizeReason reason)
+        protected override void HandleResized(Size clientSize)
         {
-            FrameSize = PlatformImpl?.FrameSize;
-
-            if (ClientSize != clientSize)
+            if (!AutoSizing)
             {
-                ClientSize = clientSize;
-                LayoutManager.ExecuteLayoutPass();
-                Renderer?.Resized(clientSize);
+                Width = clientSize.Width;
+                Height = clientSize.Height;
             }
+            ClientSize = clientSize;
+            LayoutManager.Instance.ExecuteLayoutPass();
+            Renderer?.Resized(clientSize);
         }
-
-        /// <summary>
-        /// Overrides the core measure logic for windows.
-        /// </summary>
-        /// <param name="availableSize">The available size.</param>
-        /// <returns>The measured size.</returns>
-        /// <remarks>
-        /// The layout logic for top-level windows is different than for other controls because
-        /// they don't have a parent, meaning that many layout properties handled by the default
-        /// MeasureCore (such as margins and alignment) make no sense.
-        /// </remarks>
-        protected override Size MeasureCore(Size availableSize)
-        {
-            ApplyStyling();
-            ApplyTemplate();
-
-            var constraint = LayoutHelper.ApplyLayoutConstraints(this, availableSize);
-
-            return MeasureOverride(constraint);
-        }
-
-        /// <summary>
-        /// Overrides the core arrange logic for windows.
-        /// </summary>
-        /// <param name="finalRect">The final arrange rect.</param>
-        /// <remarks>
-        /// The layout logic for top-level windows is different than for other controls because
-        /// they don't have a parent, meaning that many layout properties handled by the default
-        /// ArrangeCore (such as margins and alignment) make no sense.
-        /// </remarks>
-        protected override void ArrangeCore(Rect finalRect)
-        {
-            var constraint = ArrangeSetBounds(finalRect.Size);
-            var arrangeSize = ArrangeOverride(constraint);
-            Bounds = new Rect(arrangeSize);
-        }
-
-        /// <summary>
-        /// Called during the arrange pass to set the size of the window.
-        /// </summary>
-        /// <param name="size">The requested size of the window.</param>
-        /// <returns>The actual size of the window.</returns>
-        protected virtual Size ArrangeSetBounds(Size size) => size;
 
         /// <summary>
         /// Handles a window position change notification from 
         /// <see cref="IWindowBaseImpl.PositionChanged"/>.
         /// </summary>
         /// <param name="pos">The window position.</param>
-        private void HandlePositionChanged(PixelPoint pos)
+        private void HandlePositionChanged(Point pos)
         {
-            PositionChanged?.Invoke(this, new PixelPointEventArgs(pos));
+            PositionChanged?.Invoke(this, new PointEventArgs(pos));
         }
 
         /// <summary>
@@ -301,7 +240,7 @@ namespace Avalonia.Controls
 
             if (scope != null)
             {
-                FocusManager.Instance?.SetFocusScope(scope);
+                FocusManager.Instance.SetFocusScope(scope);
             }
 
             IsActive = true;
@@ -321,7 +260,7 @@ namespace Avalonia.Controls
         {
             if (!_ignoreVisibilityChange)
             {
-                if ((bool)e.NewValue!)
+                if ((bool)e.NewValue)
                 {
                     Show();
                 }
@@ -331,5 +270,16 @@ namespace Avalonia.Controls
                 }
             }
         }
+
+        /// <summary>
+        /// Starts moving a window with left button being held. Should be called from left mouse button press event handler
+        /// </summary>
+        public void BeginMoveDrag() => PlatformImpl?.BeginMoveDrag();
+
+        /// <summary>
+        /// Starts resizing a window. This function is used if an application has window resizing controls. 
+        /// Should be called from left mouse button press event handler
+        /// </summary>
+        public void BeginResizeDrag(WindowEdge edge) => PlatformImpl?.BeginResizeDrag(edge);
     }
 }

@@ -1,18 +1,24 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using Avalonia.Automation.Peers;
-using Avalonia.Controls.Documents;
+using System.Collections.Specialized;
+using System.Linq;
+using System.Reactive;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
+using Avalonia.Collections;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
+using Avalonia.Data;
+using Avalonia.Diagnostics;
 using Avalonia.Input;
-using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Logging;
 using Avalonia.LogicalTree;
-using Avalonia.Media;
 using Avalonia.Rendering;
 using Avalonia.Styling;
-using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace Avalonia.Controls
@@ -23,100 +29,210 @@ namespace Avalonia.Controls
     /// <remarks>
     /// The control class extends <see cref="InputElement"/> and adds the following features:
     ///
+    /// - An inherited <see cref="DataContext"/>.
     /// - A <see cref="Tag"/> property to allow user-defined data to be attached to the control.
-    /// - <see cref="ContextRequestedEvent"/> and other context menu related members.
+    /// - A collection of class strings for custom styling.
+    /// - Implements <see cref="IStyleable"/> to allow styling to work on the control.
+    /// - Implements <see cref="ILogical"/> to form part of a logical tree.
     /// </remarks>
-    public class Control : InputElement, IControl, INamed, IVisualBrushInitialize, ISetterValue
+    public class Control : InputElement, IControl, INamed, ISetInheritanceParent, ISetLogicalParent, ISupportInitialize, IVisualBrushInitialize
     {
+        /// <summary>
+        /// Defines the <see cref="DataContext"/> property.
+        /// </summary>
+        public static readonly StyledProperty<object> DataContextProperty =
+            AvaloniaProperty.Register<Control, object>(
+                nameof(DataContext), 
+                inherits: true,
+                notifying: DataContextNotifying);
+
         /// <summary>
         /// Defines the <see cref="FocusAdorner"/> property.
         /// </summary>
-        public static readonly StyledProperty<ITemplate<IControl>?> FocusAdornerProperty =
-            AvaloniaProperty.Register<Control, ITemplate<IControl>?>(nameof(FocusAdorner));
+        public static readonly StyledProperty<ITemplate<IControl>> FocusAdornerProperty =
+            AvaloniaProperty.Register<Control, ITemplate<IControl>>(nameof(FocusAdorner));
+
+        /// <summary>
+        /// Defines the <see cref="Name"/> property.
+        /// </summary>
+        public static readonly DirectProperty<Control, string> NameProperty =
+            AvaloniaProperty.RegisterDirect<Control, string>(nameof(Name), o => o.Name, (o, v) => o.Name = v);
+
+        /// <summary>
+        /// Defines the <see cref="Parent"/> property.
+        /// </summary>
+        public static readonly DirectProperty<Control, IControl> ParentProperty =
+            AvaloniaProperty.RegisterDirect<Control, IControl>(nameof(Parent), o => o.Parent);
 
         /// <summary>
         /// Defines the <see cref="Tag"/> property.
         /// </summary>
-        public static readonly StyledProperty<object?> TagProperty =
-            AvaloniaProperty.Register<Control, object?>(nameof(Tag));
-        
+        public static readonly StyledProperty<object> TagProperty =
+            AvaloniaProperty.Register<Control, object>(nameof(Tag));
+
+        /// <summary>
+        /// Defines the <see cref="TemplatedParent"/> property.
+        /// </summary>
+        public static readonly StyledProperty<ITemplatedControl> TemplatedParentProperty =
+            AvaloniaProperty.Register<Control, ITemplatedControl>(nameof(TemplatedParent), inherits: true);
+
         /// <summary>
         /// Defines the <see cref="ContextMenu"/> property.
         /// </summary>
-        public static readonly StyledProperty<ContextMenu?> ContextMenuProperty =
-            AvaloniaProperty.Register<Control, ContextMenu?>(nameof(ContextMenu));
-
-        /// <summary>
-        /// Defines the <see cref="ContextFlyout"/> property
-        /// </summary>
-        public static readonly StyledProperty<FlyoutBase?> ContextFlyoutProperty =
-            AvaloniaProperty.Register<Control, FlyoutBase?>(nameof(ContextFlyout));
+        public static readonly StyledProperty<ContextMenu> ContextMenuProperty =
+            AvaloniaProperty.Register<Control, ContextMenu>(nameof(ContextMenu));
 
         /// <summary>
         /// Event raised when an element wishes to be scrolled into view.
         /// </summary>
         public static readonly RoutedEvent<RequestBringIntoViewEventArgs> RequestBringIntoViewEvent =
-            RoutedEvent.Register<Control, RequestBringIntoViewEventArgs>(
-                "RequestBringIntoView",
-                RoutingStrategies.Bubble);
+            RoutedEvent.Register<Control, RequestBringIntoViewEventArgs>("RequestBringIntoView", RoutingStrategies.Bubble);
+
+        private int _initCount;
+        private string _name;
+        private IControl _parent;
+        private readonly Classes _classes = new Classes();
+        private DataTemplates _dataTemplates;
+        private IControl _focusAdorner;
+        private bool _isAttachedToLogicalTree;
+        private IAvaloniaList<ILogical> _logicalChildren;
+        private INameScope _nameScope;
+        private Styles _styles;
+        private bool _styled;
+        private Subject<IStyleable> _styleDetach = new Subject<IStyleable>();
 
         /// <summary>
-        /// Provides event data for the <see cref="ContextRequested"/> event.
+        /// Initializes static members of the <see cref="Control"/> class.
         /// </summary>
-        public static readonly RoutedEvent<ContextRequestedEventArgs> ContextRequestedEvent =
-            RoutedEvent.Register<Control, ContextRequestedEventArgs>(
-                nameof(ContextRequested),
-                RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
-        
-        /// <summary>
-        /// Defines the <see cref="Loaded"/> event.
-        /// </summary>
-        public static readonly RoutedEvent<RoutedEventArgs> LoadedEvent =
-            RoutedEvent.Register<Control, RoutedEventArgs>(
-                nameof(Loaded),
-                RoutingStrategies.Direct);
+        static Control()
+        {
+            AffectsMeasure(IsVisibleProperty);
+            PseudoClass(IsEnabledCoreProperty, x => !x, ":disabled");
+            PseudoClass(IsFocusedProperty, ":focus");
+            PseudoClass(IsPointerOverProperty, ":pointerover");
+        }
 
         /// <summary>
-        /// Defines the <see cref="Unloaded"/> event.
+        /// Initializes a new instance of the <see cref="Control"/> class.
         /// </summary>
-        public static readonly RoutedEvent<RoutedEventArgs> UnloadedEvent =
-            RoutedEvent.Register<Control, RoutedEventArgs>(
-                nameof(Unloaded),
-                RoutingStrategies.Direct);
+        public Control()
+        {
+            _nameScope = this as INameScope;
+        }
 
         /// <summary>
-        /// Defines the <see cref="FlowDirection"/> property.
+        /// Raised when the control is attached to a rooted logical tree.
         /// </summary>
-        public static readonly AttachedProperty<FlowDirection> FlowDirectionProperty =
-            AvaloniaProperty.RegisterAttached<Control, Control, FlowDirection>(
-                nameof(FlowDirection),
-                inherits: true);
+        public event EventHandler<LogicalTreeAttachmentEventArgs> AttachedToLogicalTree;
 
-        // Note the following:
-        // _loadedQueue :
-        //   Is the queue where any control will be added to indicate that its loaded
-        //   event should be scheduled and called later.
-        // _loadedProcessingQueue :
-        //   Contains a copied snapshot of the _loadedQueue at the time when processing
-        //   starts and individual events are being fired. This was needed to avoid
-        //   exceptions if new controls were added in the Loaded event itself.
+        /// <summary>
+        /// Raised when the control is detached from a rooted logical tree.
+        /// </summary>
+        public event EventHandler<LogicalTreeAttachmentEventArgs> DetachedFromLogicalTree;
 
-        private static bool _isLoadedProcessing = false;
-        private static readonly HashSet<Control> _loadedQueue = new HashSet<Control>();
-        private static readonly HashSet<Control> _loadedProcessingQueue = new HashSet<Control>();
+        /// <summary>
+        /// Occurs when the <see cref="DataContext"/> property changes.
+        /// </summary>
+        /// <remarks>
+        /// This event will be raised when the <see cref="DataContext"/> property has changed and
+        /// all subscribers to that change have been notified.
+        /// </remarks>
+        public event EventHandler DataContextChanged;
 
-        private bool _isLoaded = false;
-        private DataTemplates? _dataTemplates;
-        private IControl? _focusAdorner;
-        private AutomationPeer? _automationPeer;
+        /// <summary>
+        /// Occurs when the control has finished initialization.
+        /// </summary>
+        /// <remarks>
+        /// The Initialized event indicates that all property values on the control have been set.
+        /// When loading the control from markup, it occurs when 
+        /// <see cref="ISupportInitialize.EndInit"/> is called *and* the control
+        /// is attached to a rooted logical tree. When the control is created by code and
+        /// <see cref="ISupportInitialize"/> is not used, it is called when the control is attached
+        /// to the visual tree.
+        /// </remarks>
+        public event EventHandler Initialized;
+
+        /// <summary>
+        /// Gets or sets the name of the control.
+        /// </summary>
+        /// <remarks>
+        /// An element's name is used to uniquely identify a control within the control's name
+        /// scope. Once the element is added to a logical tree, its name cannot be changed.
+        /// </remarks>
+        public string Name
+        {
+            get
+            {
+                return _name;
+            }
+
+            set
+            {
+                if (value.Trim() == string.Empty)
+                {
+                    throw new InvalidOperationException("Cannot set Name to empty string.");
+                }
+
+                if (_styled)
+                {
+                    throw new InvalidOperationException("Cannot set Name : control already styled.");
+                }
+
+                _name = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the control's classes.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Classes can be used to apply user-defined styling to controls, or to allow controls
+        /// that share a common purpose to be easily selected.
+        /// </para>
+        /// <para>
+        /// Even though this property can be set, the setter is only intended for use in object
+        /// initializers. Assigning to this property does not change the underlying collection,
+        /// it simply clears the existing collection and addds the contents of the assigned
+        /// collection.
+        /// </para>
+        /// </remarks>
+        public Classes Classes
+        {
+            get
+            {
+                return _classes;
+            }
+
+            set
+            {
+                if (_classes != value)
+                {
+                    _classes.Replace(value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the control's data context.
+        /// </summary>
+        /// <remarks>
+        /// The data context is an inherited property that specifies the default object that will
+        /// be used for data binding.
+        /// </remarks>
+        public object DataContext
+        {
+            get { return GetValue(DataContextProperty); }
+            set { SetValue(DataContextProperty, value); }
+        }
 
         /// <summary>
         /// Gets or sets the control's focus adorner.
         /// </summary>
-        public ITemplate<IControl>? FocusAdorner
+        public ITemplate<IControl> FocusAdorner
         {
-            get => GetValue(FocusAdornerProperty);
-            set => SetValue(FocusAdornerProperty, value);
+            get { return GetValue(FocusAdornerProperty); }
+            set { SetValue(FocusAdornerProperty, value); }
         }
 
         /// <summary>
@@ -126,136 +242,224 @@ namespace Avalonia.Controls
         /// Each control may define data templates which are applied to the control itself and its
         /// children.
         /// </remarks>
-        public DataTemplates DataTemplates => _dataTemplates ??= new DataTemplates();
+        public DataTemplates DataTemplates
+        {
+            get { return _dataTemplates ?? (_dataTemplates = new DataTemplates()); }
+            set { _dataTemplates = value; }
+        }
+
+        /// <summary>
+        /// Gets a value that indicates whether the element has finished initialization.
+        /// </summary>
+        /// <remarks>
+        /// For more information about when IsInitialized is set, see the <see cref="Initialized"/>
+        /// event.
+        /// </remarks>
+        public bool IsInitialized { get; private set; }
+
+        /// <summary>
+        /// Gets or sets the styles for the control.
+        /// </summary>
+        /// <remarks>
+        /// Styles for the entire application are added to the Application.Styles collection, but
+        /// each control may in addition define its own styles which are applied to the control
+        /// itself and its children.
+        /// </remarks>
+        public Styles Styles
+        {
+            get { return _styles ?? (_styles = new Styles()); }
+            set { _styles = value; }
+        }
+
+        /// <summary>
+        /// Gets the control's logical parent.
+        /// </summary>
+        public IControl Parent => _parent;
 
         /// <summary>
         /// Gets or sets a context menu to the control.
         /// </summary>
-        public ContextMenu? ContextMenu
+        public ContextMenu ContextMenu
         {
-            get => GetValue(ContextMenuProperty);
-            set => SetValue(ContextMenuProperty, value);
+            get { return GetValue(ContextMenuProperty); }
+            set { SetValue(ContextMenuProperty, value); }
         }
-
-        /// <summary>
-        /// Gets or sets a context flyout to the control
-        /// </summary>
-        public FlyoutBase? ContextFlyout
-        {
-            get => GetValue(ContextFlyoutProperty);
-            set => SetValue(ContextFlyoutProperty, value);
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether the control is fully constructed in the visual tree
-        /// and both layout and render are complete.
-        /// </summary>
-        /// <remarks>
-        /// This is set to true while raising the <see cref="Loaded"/> event.
-        /// </remarks>
-        public bool IsLoaded => _isLoaded;
 
         /// <summary>
         /// Gets or sets a user-defined object attached to the control.
         /// </summary>
-        public object? Tag
+        public object Tag
         {
-            get => GetValue(TagProperty);
-            set => SetValue(TagProperty, value);
-        }
-        
-        /// <summary>
-        /// Gets or sets the text flow direction.
-        /// </summary>
-        public FlowDirection FlowDirection
-        {
-            get => GetValue(FlowDirectionProperty);
-            set => SetValue(FlowDirectionProperty, value);
+            get { return GetValue(TagProperty); }
+            set { SetValue(TagProperty, value); }
         }
 
         /// <summary>
-        /// Occurs when the user has completed a context input gesture, such as a right-click.
+        /// Gets the control whose lookless template this control is part of.
         /// </summary>
-        public event EventHandler<ContextRequestedEventArgs>? ContextRequested
+        public ITemplatedControl TemplatedParent
         {
-            add => AddHandler(ContextRequestedEvent, value);
-            remove => RemoveHandler(ContextRequestedEvent, value);
+            get { return GetValue(TemplatedParentProperty); }
+            internal set { SetValue(TemplatedParentProperty, value); }
         }
 
         /// <summary>
-        /// Occurs when the control has been fully constructed in the visual tree and both
-        /// layout and render are complete.
+        /// Gets a value indicating whether the element is attached to a rooted logical tree.
         /// </summary>
-        /// <remarks>
-        /// This event is guaranteed to occur after the control template is applied and references
-        /// to objects created after the template is applied are available. This makes it different
-        /// from OnAttachedToVisualTree which doesn't have these references. This event occurs at the
-        /// latest possible time in the control creation life-cycle.
-        /// </remarks>
-        public event EventHandler<RoutedEventArgs>? Loaded
-        {
-            add => AddHandler(LoadedEvent, value);
-            remove => RemoveHandler(LoadedEvent, value);
-        }
+        bool ILogical.IsAttachedToLogicalTree => _isAttachedToLogicalTree;
 
         /// <summary>
-        /// Occurs when the control is removed from the visual tree.
+        /// Gets the control's logical parent.
+        /// </summary>
+        ILogical ILogical.LogicalParent => Parent;
+
+        /// <summary>
+        /// Gets the control's logical children.
+        /// </summary>
+        IAvaloniaReadOnlyList<ILogical> ILogical.LogicalChildren => LogicalChildren;
+
+        /// <inheritdoc/>
+        IAvaloniaReadOnlyList<string> IStyleable.Classes => Classes;
+
+        /// <summary>
+        /// Gets the type by which the control is styled.
         /// </summary>
         /// <remarks>
-        /// This is API symmetrical with <see cref="Loaded"/> and exists for compatibility with other
-        /// XAML frameworks; however, it behaves the same as OnDetachedFromVisualTree.
+        /// Usually controls are styled by their own type, but there are instances where you want
+        /// a control to be styled by its base type, e.g. creating SpecialButton that
+        /// derives from Button and adds extra functionality but is still styled as a regular
+        /// Button.
         /// </remarks>
-        public event EventHandler<RoutedEventArgs>? Unloaded
-        {
-            add => AddHandler(UnloadedEvent, value);
-            remove => RemoveHandler(UnloadedEvent, value);
-        }
+        Type IStyleable.StyleKey => GetType();
 
-        public new IControl? Parent => (IControl?)base.Parent;
+        /// <inheritdoc/>
+        IObservable<IStyleable> IStyleable.StyleDetach => _styleDetach;
 
-        /// <summary>
-        /// Gets the value of the attached <see cref="FlowDirectionProperty"/> on a control.
-        /// </summary>
-        /// <param name="control">The control.</param>
-        /// <returns>The flow direction.</returns>
-        public static FlowDirection GetFlowDirection(Control control)
-        {
-            return control.GetValue(FlowDirectionProperty);
-        }
+        /// <inheritdoc/>
+        IStyleHost IStyleHost.StylingParent => (IStyleHost)InheritanceParent;
 
-        /// <summary>
-        /// Sets the value of the attached <see cref="FlowDirectionProperty"/> on a control.
-        /// </summary>
-        /// <param name="control">The control.</param>
-        /// <param name="value">The property value to set.</param>
-        public static void SetFlowDirection(Control control, FlowDirection value)
+        /// <inheritdoc/>
+        public virtual void BeginInit()
         {
-            control.SetValue(FlowDirectionProperty, value);
+            ++_initCount;
         }
 
         /// <inheritdoc/>
-        bool IDataTemplateHost.IsDataTemplatesInitialized => _dataTemplates != null;
-
-        /// <summary>
-        /// Gets a value indicating whether control bypass FlowDirecton policies.
-        /// </summary>
-        /// <remarks>
-        /// Related to FlowDirection system and returns false as default, so if 
-        /// <see cref="FlowDirection"/> is RTL then control will get a mirror presentation. 
-        /// For controls that want to avoid this behavior, override this property and return true.
-        /// </remarks>
-        protected virtual bool BypassFlowDirectionPolicies => false;
-
-        /// <inheritdoc/>
-        void ISetterValue.Initialize(ISetter setter)
+        public virtual void EndInit()
         {
-            if (setter is Setter s && s.Property == ContextFlyoutProperty)
+            if (_initCount == 0)
             {
-                return; // Allow ContextFlyout to not need wrapping in <Template>
+                throw new InvalidOperationException("BeginInit was not called.");
             }
 
-            throw new InvalidOperationException(
-                "Cannot use a control as a Setter value. Wrap the control in a <Template>.");
+            if (--_initCount == 0 && _isAttachedToLogicalTree)
+            {
+                if (!_styled)
+                {
+                    RegisterWithNameScope();
+                    ApplyStyling();
+                    _styled = true;
+                }
+
+                if (!IsInitialized)
+                {
+                    IsInitialized = true;
+                    Initialized?.Invoke(this, EventArgs.Empty);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        void ILogical.NotifyDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
+        {
+            this.OnDetachedFromLogicalTreeCore(e);
+        }
+
+        /// <summary>
+        /// Gets the control's logical children.
+        /// </summary>
+        protected IAvaloniaList<ILogical> LogicalChildren
+        {
+            get
+            {
+                if (_logicalChildren == null)
+                {
+                    var list = new AvaloniaList<ILogical>();
+                    list.ResetBehavior = ResetBehavior.Remove;
+                    list.Validate = ValidateLogicalChild;
+                    list.CollectionChanged += LogicalChildrenCollectionChanged;
+                    _logicalChildren = list;
+                }
+
+                return _logicalChildren;
+            }
+        }
+
+        /// <summary>
+        /// Gets the <see cref="Classes"/> collection in a form that allows adding and removing
+        /// pseudoclasses.
+        /// </summary>
+        protected IPseudoClasses PseudoClasses => Classes;
+
+        /// <summary>
+        /// Sets the control's logical parent.
+        /// </summary>
+        /// <param name="parent">The parent.</param>
+        void ISetLogicalParent.SetParent(ILogical parent)
+        {
+            var old = Parent;
+
+            if (parent != old)
+            {
+                if (old != null && parent != null)
+                {
+                    throw new InvalidOperationException("The Control already has a parent.");
+                }
+
+                if (_isAttachedToLogicalTree)
+                {
+                    var oldRoot = FindStyleRoot(old);
+
+                    if (oldRoot == null)
+                    {
+                        throw new AvaloniaInternalException("Was attached to logical tree but cannot find root.");
+                    }
+
+                    var e = new LogicalTreeAttachmentEventArgs(oldRoot);
+                    OnDetachedFromLogicalTreeCore(e);
+                }
+
+                if (InheritanceParent == null || parent == null)
+                {
+                    InheritanceParent = parent as AvaloniaObject;
+                }
+
+                _parent = (IControl)parent;
+
+                if (_parent is IStyleRoot || _parent?.IsAttachedToLogicalTree == true)
+                {
+                    var newRoot = FindStyleRoot(this);
+
+                    if (newRoot == null)
+                    {
+                        throw new AvaloniaInternalException("Parent is atttached to logical tree but cannot find root.");
+                    }
+
+                    var e = new LogicalTreeAttachmentEventArgs(newRoot);
+                    OnAttachedToLogicalTreeCore(e);
+                }
+
+                RaisePropertyChanged(ParentProperty, old, _parent, BindingPriority.LocalValue);
+            }
+        }
+
+        /// <summary>
+        /// Sets the control's inheritance parent.
+        /// </summary>
+        /// <param name="parent">The parent.</param>
+        void ISetInheritanceParent.SetParent(IAvaloniaObject parent)
+        {
+            InheritanceParent = parent;
         }
 
         /// <inheritdoc/>
@@ -265,14 +469,19 @@ namespace Avalonia.Controls
             {
                 if (!IsInitialized)
                 {
-                    foreach (var i in this.GetSelfAndVisualDescendants())
+                    foreach (var i in this.GetSelfAndVisualDescendents())
                     {
                         var c = i as IControl;
 
-                        if (c?.IsInitialized == false && c is ISupportInitialize init)
+                        if (c?.IsInitialized == false)
                         {
-                            init.BeginInit();
-                            init.EndInit();
+                            var init = c as ISupportInitialize;
+
+                            if (init != null)
+                            {
+                                init.BeginInit();
+                                init.EndInit();
+                            }
                         }
                     }
                 }
@@ -286,109 +495,77 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Gets the element that receives the focus adorner.
+        /// Adds a pseudo-class to be set when a property is true.
         /// </summary>
-        /// <returns>The control that receives the focus adorner.</returns>
-        protected virtual IControl? GetTemplateFocusTarget() => this;
-
-        private static Action loadedProcessingAction = () =>
+        /// <param name="property">The property.</param>
+        /// <param name="className">The pseudo-class.</param>
+        protected static void PseudoClass(AvaloniaProperty<bool> property, string className)
         {
-            // Copy the loaded queue for processing
-            // There was a possibility of the "Collection was modified; enumeration operation may not execute."
-            // exception when only a single hash set was used. This could happen when new controls are added
-            // within the Loaded callback/event itself. To fix this, two hash sets are used and while one is
-            // being processed the other accepts adding new controls to process next.
-            _loadedProcessingQueue.Clear();
-            foreach (Control control in _loadedQueue)
-            {
-                _loadedProcessingQueue.Add(control);
-            }
-            _loadedQueue.Clear();
-
-            foreach (Control control in _loadedProcessingQueue)
-            {
-                control.OnLoadedCore();
-            }
-
-            _loadedProcessingQueue.Clear();
-            _isLoadedProcessing = false;
-
-            // Restart if any controls were added to the queue while processing
-            if (_loadedQueue.Count > 0)
-            {
-                _isLoadedProcessing = true;
-                Dispatcher.UIThread.Post(loadedProcessingAction!, DispatcherPriority.Loaded);
-            }
-        };
+            PseudoClass(property, x => x, className);
+        }
 
         /// <summary>
-        /// Schedules <see cref="OnLoadedCore"/> to be called for this control.
-        /// For performance, it will be queued with other controls.
+        /// Adds a pseudo-class to be set when a property equals a certain value.
         /// </summary>
-        internal void ScheduleOnLoadedCore()
+        /// <typeparam name="T">The type of the property.</typeparam>
+        /// <param name="property">The property.</param>
+        /// <param name="selector">Returns a boolean value based on the property value.</param>
+        /// <param name="className">The pseudo-class.</param>
+        protected static void PseudoClass<T>(
+            AvaloniaProperty<T> property,
+            Func<T, bool> selector,
+            string className)
         {
-            if (_isLoaded == false)
-            {
-                bool isAdded = _loadedQueue.Add(this);
+            Contract.Requires<ArgumentNullException>(property != null);
+            Contract.Requires<ArgumentNullException>(selector != null);
+            Contract.Requires<ArgumentNullException>(className != null);
+            Contract.Requires<ArgumentNullException>(property != null);
 
-                if (isAdded &&
-                    _isLoadedProcessing == false)
+            if (string.IsNullOrWhiteSpace(className))
+            {
+                throw new ArgumentException("Cannot supply an empty className.");
+            }
+
+            property.Changed.Merge(property.Initialized)
+                .Where(e => e.Sender is Control)
+                .Subscribe(e =>
                 {
-                    _isLoadedProcessing = true;
-                    Dispatcher.UIThread.Post(loadedProcessingAction!, DispatcherPriority.Loaded);
-                }
-            }
+                    if (selector((T)e.NewValue))
+                    {
+                        ((Control)e.Sender).PseudoClasses.Add(className);
+                    }
+                    else
+                    {
+                        ((Control)e.Sender).PseudoClasses.Remove(className);
+                    }
+                });
         }
 
         /// <summary>
-        /// Invoked as the first step of marking the control as loaded and raising the
-        /// <see cref="Loaded"/> event.
+        /// Gets the element that recieves the focus adorner.
         /// </summary>
-        internal void OnLoadedCore()
+        /// <returns>The control that recieves the focus adorner.</returns>
+        protected virtual IControl GetTemplateFocusTarget()
         {
-            if (_isLoaded == false &&
-                ((ILogical)this).IsAttachedToLogicalTree)
-            {
-                _isLoaded = true;
-                OnLoaded();
-            }
+            return this;
         }
 
         /// <summary>
-        /// Invoked as the first step of marking the control as unloaded and raising the
-        /// <see cref="Unloaded"/> event.
+        /// Called when the control is added to a rooted logical tree.
         /// </summary>
-        internal void OnUnloadedCore()
+        /// <param name="e">The event args.</param>
+        protected virtual void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
         {
-            if (_isLoaded)
-            {
-                // Remove from the loaded event queue here as a failsafe in case the control
-                // is detached before the dispatcher runs the Loaded jobs.
-                _loadedQueue.Remove(this);
-
-                _isLoaded = false;
-                OnUnloaded();
-            }
+            AttachedToLogicalTree?.Invoke(this, e);
         }
 
         /// <summary>
-        /// Invoked just before the <see cref="Loaded"/> event.
+        /// Called when the control is removed from a rooted logical tree.
         /// </summary>
-        protected virtual void OnLoaded()
+        /// <param name="e">The event args.</param>
+        protected virtual void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
         {
-            var eventArgs = new RoutedEventArgs(LoadedEvent);
-            eventArgs.Source = null;
-            RaiseEvent(eventArgs);
-        }
-
-        /// <summary>
-        /// Invoked just before the <see cref="Unloaded"/> event.
-        /// </summary>
-        protected virtual void OnUnloaded()
-        {
-            var eventArgs = new RoutedEventArgs(UnloadedEvent);
-            eventArgs.Source = null;
-            RaiseEvent(eventArgs);
+            DetachedFromLogicalTree?.Invoke(this, e);
         }
 
         /// <inheritdoc/>
@@ -396,25 +573,32 @@ namespace Avalonia.Controls
         {
             base.OnAttachedToVisualTreeCore(e);
 
-            InitializeIfNeeded();
-
-            ScheduleOnLoadedCore();
+            if (!IsInitialized)
+            {
+                IsInitialized = true;
+                Initialized?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         /// <inheritdoc/>
         protected sealed override void OnDetachedFromVisualTreeCore(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTreeCore(e);
-
-            OnUnloadedCore();
         }
 
-        /// <inheritdoc/>
-        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        /// <summary>
+        /// Called before the <see cref="DataContext"/> property changes.
+        /// </summary>
+        protected virtual void OnDataContextChanging()
         {
-            base.OnAttachedToVisualTree(e);
+        }
 
-            InvalidateMirrorTransform();
+        /// <summary>
+        /// Called after the <see cref="DataContext"/> property changes.
+        /// </summary>
+        protected virtual void OnDataContextChanged()
+        {
+            DataContextChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <inheritdoc/>
@@ -440,10 +624,15 @@ namespace Avalonia.Controls
                         }
                     }
 
-                    if (_focusAdorner != null && GetTemplateFocusTarget() is Visual target)
+                    if (_focusAdorner != null)
                     {
-                        AdornerLayer.SetAdornedElement((Visual)_focusAdorner, target);
-                        adornerLayer.Children.Add(_focusAdorner);
+                        var target = (Visual)GetTemplateFocusTarget();
+
+                        if (target != null)
+                        {
+                            AdornerLayer.SetAdornedElement((Visual)_focusAdorner, target);
+                            adornerLayer.Children.Add(_focusAdorner);
+                        }
                     }
                 }
             }
@@ -454,7 +643,7 @@ namespace Avalonia.Controls
         {
             base.OnLostFocus(e);
 
-            if (_focusAdorner?.Parent != null)
+            if (_focusAdorner != null)
             {
                 var adornerLayer = (IPanel)_focusAdorner.Parent;
                 adornerLayer.Children.Remove(_focusAdorner);
@@ -462,117 +651,189 @@ namespace Avalonia.Controls
             }
         }
 
-        protected virtual AutomationPeer OnCreateAutomationPeer()
-        {
-            return new NoneAutomationPeer(this);
-        }
-
-        internal AutomationPeer GetOrCreateAutomationPeer()
-        {
-            VerifyAccess();
-
-            if (_automationPeer is object)
-            {
-                return _automationPeer;
-            }
-
-            _automationPeer = OnCreateAutomationPeer();
-            return _automationPeer;
-        }
-
-        protected override void OnPointerReleased(PointerReleasedEventArgs e)
-        {
-            base.OnPointerReleased(e);
-
-            if (e.Source == this
-                && !e.Handled
-                && e.InitialPressMouseButton == MouseButton.Right)
-            {
-                var args = new ContextRequestedEventArgs(e);
-                RaiseEvent(args);
-                e.Handled = args.Handled;
-            }
-        }
-
-        protected override void OnKeyUp(KeyEventArgs e)
-        {
-            base.OnKeyUp(e);
-
-            if (e.Source == this
-                && !e.Handled)
-            {
-                var keymap = AvaloniaLocator.Current.GetService<PlatformHotkeyConfiguration>()?.OpenContextMenu;
-
-                if (keymap is null)
-                {
-                    return;
-                }
-
-                var matches = false;
-
-                for (var index = 0; index < keymap.Count; index++)
-                {
-                    var key = keymap[index];
-                    matches |= key.Matches(e);
-
-                    if (matches)
-                    {
-                        break;
-                    }
-                }
-
-                if (matches)
-                {
-                    var args = new ContextRequestedEventArgs();
-                    RaiseEvent(args);
-                    e.Handled = args.Handled;
-                }
-            }
-        }
-
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            if (change.Property == FlowDirectionProperty)
-            {
-                InvalidateMirrorTransform();
-                
-                foreach (var visual in VisualChildren)
-                {
-                    if (visual is Control child)
-                    {
-                        child.InvalidateMirrorTransform();
-                    }
-                }
-            }
-        }
-
         /// <summary>
-        /// Computes the <see cref="IVisual.HasMirrorTransform"/> value according to the 
-        /// <see cref="FlowDirection"/> and <see cref="BypassFlowDirectionPolicies"/>
+        /// Called when the <see cref="DataContext"/> property begins and ends being notified.
         /// </summary>
-        public virtual void InvalidateMirrorTransform()
+        /// <param name="o">The object on which the DataContext is changing.</param>
+        /// <param name="notifying">Whether the notifcation is beginning or ending.</param>
+        private static void DataContextNotifying(IAvaloniaObject o, bool notifying)
         {
-            var flowDirection = this.FlowDirection;
-            var parentFlowDirection = FlowDirection.LeftToRight;
+            var control = o as Control;
 
-            bool bypassFlowDirectionPolicies = BypassFlowDirectionPolicies;
-            bool parentBypassFlowDirectionPolicies = false;
-
-            var parent = ((IVisual)this).VisualParent as Control;
-            if (parent != null)
+            if (control != null)
             {
-                parentFlowDirection = parent.FlowDirection;
-                parentBypassFlowDirectionPolicies = parent.BypassFlowDirectionPolicies;
+                if (notifying)
+                {
+                    control.OnDataContextChanging();
+                }
+                else
+                {
+                    control.OnDataContextChanged();
+                }
+            }
+        }
+
+        private static IStyleRoot FindStyleRoot(IStyleHost e)
+        {
+            while (e != null)
+            {
+                var root = e as IStyleRoot;
+
+                if (root != null && root.StylingParent == null)
+                {
+                    return root;
+                }
+
+                e = e.StylingParent;
             }
 
-            bool thisShouldBeMirrored = flowDirection == FlowDirection.RightToLeft && !bypassFlowDirectionPolicies;
-            bool parentShouldBeMirrored = parentFlowDirection == FlowDirection.RightToLeft && !parentBypassFlowDirectionPolicies;
+            return null;
+        }
 
-            bool shouldApplyMirrorTransform = thisShouldBeMirrored != parentShouldBeMirrored;
+        private void ApplyStyling()
+        {
+            AvaloniaLocator.Current.GetService<IStyler>()?.ApplyStyles(this);
+        }
 
-            HasMirrorTransform = shouldApplyMirrorTransform;
+        private void RegisterWithNameScope()
+        {
+            if (_nameScope == null)
+            {
+                _nameScope = NameScope.GetNameScope(this) ?? ((Control)Parent)?._nameScope;
+            }
+
+            if (Name != null)
+            {
+                _nameScope?.Register(Name, this);
+
+                var visualParent = Parent as Visual;
+
+                if (this is INameScope && visualParent != null)
+                {
+                    // If we have e.g. a named UserControl in a window then we want that control
+                    // to be findable by name from the Window, so register with both name scopes.
+                    // This differs from WPF's behavior in that XAML manually registers controls 
+                    // with name scopes based on the XAML file in which the name attribute appears,
+                    // but we're trying to avoid XAML magic in Avalonia in order to made code-
+                    // created UIs easy. This will cause problems if a UserControl declares a name
+                    // in its XAML and that control is included multiple times in a parent control
+                    // (as the name will be duplicated), however at the moment I'm fine with saying
+                    // "don't do that".
+                    var parentNameScope = NameScope.FindNameScope(visualParent);
+                    parentNameScope?.Register(Name, this);
+                }
+            }
+        }
+
+        private static void ValidateLogicalChild(ILogical c)
+        {
+            if (c == null)
+            {
+                throw new ArgumentException("Cannot add null to LogicalChildren.");
+            }
+        }
+
+        private void OnAttachedToLogicalTreeCore(LogicalTreeAttachmentEventArgs e)
+        {
+            // This method can be called when a control is already attached to the logical tree
+            // in the following scenario:
+            // - ListBox gets assigned Items containing ListBoxItem
+            // - ListBox makes ListBoxItem a logical child
+            // - ListBox template gets applied; making its Panel get attached to logical tree
+            // - That AttachedToLogicalTree signal travels down to the ListBoxItem
+            if (!_isAttachedToLogicalTree)
+            {
+                _isAttachedToLogicalTree = true;
+
+                if (_initCount == 0)
+                {
+                    RegisterWithNameScope();
+                    ApplyStyling();
+                    _styled = true;
+                }
+
+                OnAttachedToLogicalTree(e);
+            }
+
+            foreach (var child in LogicalChildren.OfType<Control>())
+            {
+                child.OnAttachedToLogicalTreeCore(e);
+            }
+        }
+
+        private void OnDetachedFromLogicalTreeCore(LogicalTreeAttachmentEventArgs e)
+        {
+            if (_isAttachedToLogicalTree)
+            {
+                if (Name != null)
+                {
+                    _nameScope?.Unregister(Name);
+                }
+
+                _isAttachedToLogicalTree = false;
+                _styleDetach.OnNext(this);
+                OnDetachedFromLogicalTree(e);
+
+                foreach (var child in LogicalChildren.OfType<Control>())
+                {
+                    child.OnDetachedFromLogicalTreeCore(e);
+                }
+
+#if DEBUG
+                if (((INotifyCollectionChangedDebug)_classes).GetCollectionChangedSubscribers()?.Length > 0)
+                {
+                    Logger.Warning(
+                        LogArea.Control,
+                        this,
+                        "{Type} detached from logical tree but still has class listeners",
+                        this.GetType());
+                }
+#endif
+            }
+        }
+
+        private void LogicalChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                    SetLogicalParent(e.NewItems.Cast<ILogical>());
+                    break;
+
+                case NotifyCollectionChangedAction.Remove:
+                    ClearLogicalParent(e.OldItems.Cast<ILogical>());
+                    break;
+
+                case NotifyCollectionChangedAction.Replace:
+                    ClearLogicalParent(e.OldItems.Cast<ILogical>());
+                    SetLogicalParent(e.NewItems.Cast<ILogical>());
+                    break;
+
+                case NotifyCollectionChangedAction.Reset:
+                    throw new NotSupportedException("Reset should not be signalled on LogicalChildren collection");
+            }
+        }
+
+        private void SetLogicalParent(IEnumerable<ILogical> children)
+        {
+            foreach (var i in children)
+            {
+                if (i.LogicalParent == null)
+                {
+                    ((ISetLogicalParent)i).SetParent(this);
+                }
+            }
+        }
+
+        private void ClearLogicalParent(IEnumerable<ILogical> children)
+        {
+            foreach (var i in children)
+            {
+                if (i.LogicalParent == this)
+                {
+                    ((ISetLogicalParent)i).SetParent(null);
+                }
+            }
         }
     }
 }

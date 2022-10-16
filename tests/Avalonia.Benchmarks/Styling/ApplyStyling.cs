@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
@@ -8,7 +11,6 @@ using Avalonia.VisualTree;
 
 namespace Avalonia.Benchmarks.Styling
 {
-    [MemoryDiagnoser]
     public class ApplyStyling : IDisposable
     {
         private IDisposable _app;
@@ -30,7 +32,7 @@ namespace Avalonia.Benchmarks.Styling
 
             var border = (Border)textBox.GetVisualChildren().Single();
 
-            if (border.BorderThickness != new Thickness(2))
+            if (border.BorderThickness != 2)
             {
                 throw new Exception("Styles not applied.");
             }
@@ -42,7 +44,7 @@ namespace Avalonia.Benchmarks.Styling
             {
                 _window.Styles.Add(new Style(x => x.OfType<TextBox>().Class("foo").Class("bar").Class("baz"))
                 {
-                    Setters =
+                    Setters = new[]
                     {
                         new Setter(TextBox.TextProperty, "foo"),
                     }

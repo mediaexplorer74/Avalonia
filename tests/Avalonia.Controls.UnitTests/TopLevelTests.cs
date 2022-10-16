@@ -1,32 +1,25 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
+using System.Reactive;
+using System.Reactive.Subjects;
+using Moq;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Layout;
-using Avalonia.LogicalTree;
 using Avalonia.Platform;
+using Avalonia.Rendering;
 using Avalonia.Styling;
 using Avalonia.UnitTests;
-using Moq;
 using Xunit;
 
 namespace Avalonia.Controls.UnitTests
 {
     public class TopLevelTests
     {
-        [Fact]
-        public void IsAttachedToLogicalTree_Is_True()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var impl = new Mock<ITopLevelImpl>();
-                var target = new TestTopLevel(impl.Object);
-
-                Assert.True(((ILogical)target).IsAttachedToLogicalTree);
-            }
-        }
-
         [Fact]
         public void ClientSize_Should_Be_Set_On_Construction()
         {
@@ -72,16 +65,15 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void Layout_Pass_Should_Not_Be_Automatically_Scheduled()
         {
-            var services = TestServices.StyledWindow;
+            var services = TestServices.StyledWindow.With(layoutManager: Mock.Of<ILayoutManager>());
 
             using (UnitTestApplication.Start(services))
             {
                 var impl = new Mock<ITopLevelImpl>();
-                
-                var target = new TestTopLevel(impl.Object, Mock.Of<ILayoutManager>());
+                var target = new TestTopLevel(impl.Object);
 
                 // The layout pass should be scheduled by the derived class.
-                var layoutManagerMock = Mock.Get(target.LayoutManager);
+                var layoutManagerMock = Mock.Get(LayoutManager.Instance);
                 layoutManagerMock.Verify(x => x.ExecuteLayoutPass(), Times.Never);
             }
         }
@@ -93,7 +85,7 @@ namespace Avalonia.Controls.UnitTests
             {
                 var impl = new Mock<ITopLevelImpl>();
                 impl.SetupProperty(x => x.Resized);
-                impl.SetupGet(x => x.RenderScaling).Returns(1);
+                impl.SetupGet(x => x.Scaling).Returns(1);
 
                 var target = new TestTopLevel(impl.Object)
                 {
@@ -106,7 +98,7 @@ namespace Avalonia.Controls.UnitTests
                     }
                 };
 
-                target.LayoutManager.ExecuteInitialLayoutPass();
+                LayoutManager.Instance.ExecuteInitialLayoutPass(target);
 
                 Assert.Equal(new Rect(0, 0, 321, 432), target.Bounds);
             }
@@ -121,7 +113,7 @@ namespace Avalonia.Controls.UnitTests
                 impl.Setup(x => x.ClientSize).Returns(new Size(123, 456));
 
                 var target = new TestTopLevel(impl.Object);
-                target.LayoutManager.ExecuteLayoutPass();
+                LayoutManager.Instance.ExecuteLayoutPass();
 
                 Assert.Equal(double.NaN, target.Width);
                 Assert.Equal(double.NaN, target.Height);
@@ -139,7 +131,7 @@ namespace Avalonia.Controls.UnitTests
 
                 // The user has resized the window, so we can no longer auto-size.
                 var target = new TestTopLevel(impl.Object);
-                impl.Object.Resized(new Size(100, 200), PlatformResizeReason.Unspecified);
+                impl.Object.Resized(new Size(100, 200));
 
                 Assert.Equal(100, target.Width);
                 Assert.Equal(200, target.Height);
@@ -165,37 +157,9 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
-        public void Impl_Close_Should_Raise_DetachedFromLogicalTree_Event()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var impl = new Mock<ITopLevelImpl>();
-                impl.SetupAllProperties();
-
-                var target = new TestTopLevel(impl.Object);
-                var raised = 0;
-
-                target.DetachedFromLogicalTree += (s, e) =>
-                {
-                    Assert.Same(target, e.Root);
-                    Assert.Same(target, e.Source);
-                    Assert.Null(e.Parent);
-                    ++raised;
-                };
-
-                impl.Object.Closed();
-
-                Assert.Equal(1, raised);
-            }
-        }
-
-        [Fact]
         public void Impl_Input_Should_Pass_Input_To_InputManager()
         {
             var inputManagerMock = new Mock<IInputManager>();
-            inputManagerMock.DefaultValue = DefaultValue.Mock;
-            inputManagerMock.SetupAllProperties();
-
             var services = TestServices.StyledWindow.With(inputManager: inputManagerMock.Object);
 
             using (UnitTestApplication.Start(services))
@@ -208,9 +172,8 @@ namespace Avalonia.Controls.UnitTests
                 var input = new RawKeyEventArgs(
                     new Mock<IKeyboardDevice>().Object,
                     0,
-                    target,
                     RawKeyEventType.KeyDown,
-                    Key.A, RawInputModifiers.None);
+                    Key.A, InputModifiers.None);
                 impl.Object.Input(input);
 
                 inputManagerMock.Verify(x => x.ProcessInput(input));
@@ -229,106 +192,48 @@ namespace Avalonia.Controls.UnitTests
 
                 target.Template = CreateTemplate();
                 target.Content = child;
-                target.ApplyTemplate();
 
-                Assert.Throws<InvalidOperationException>(() => target.Presenter.ApplyTemplate());
+                Assert.Throws<InvalidOperationException>(() => target.ApplyTemplate());
             }
         }
 
         [Fact]
-        public void Adding_Resource_To_Application_Should_Raise_ResourcesChanged()
+        public void Exiting_Application_Notifies_Top_Level()
         {
             using (UnitTestApplication.Start(TestServices.StyledWindow))
             {
                 var impl = new Mock<ITopLevelImpl>();
                 impl.SetupAllProperties();
                 var target = new TestTopLevel(impl.Object);
-                var raised = false;
-
-                target.ResourcesChanged += (_, __) => raised = true;
-                Application.Current.Resources.Add("foo", "bar");
-
-                Assert.True(raised);
-            }
-        }
-
-        [Fact]
-        public void Close_Should_Dispose_LayoutManager()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var impl = new Mock<ITopLevelImpl>();
-                impl.SetupAllProperties();
-
-                var layoutManager = new Mock<ILayoutManager>();
-                var target = new TestTopLevel(impl.Object, layoutManager.Object);
-
-                impl.Object.Closed();
-
-                layoutManager.Verify(x => x.Dispose());
-            }
-        }
-
-        [Fact]
-        public void Reacts_To_Changes_In_Global_Styles()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var impl = new Mock<ITopLevelImpl>();
-                impl.SetupGet(x => x.RenderScaling).Returns(1);
-
-                var child = new Border { Classes = { "foo" } };
-                var target = new TestTopLevel(impl.Object)
-                {
-                    Template = CreateTemplate(),
-                    Content = child,
-                };
-
-                target.LayoutManager.ExecuteInitialLayoutPass();
-
-                Assert.Equal(new Thickness(0), child.BorderThickness);
-
-                var style = new Style(x => x.OfType<Border>().Class("foo"))
-                {
-                    Setters =
-                    {
-                        new Setter(Border.BorderThicknessProperty, new Thickness(2))
-                    }
-                };
-
-                Application.Current.Styles.Add(style);
-                target.LayoutManager.ExecuteInitialLayoutPass();
-
-                Assert.Equal(new Thickness(2), child.BorderThickness);
-
-                Application.Current.Styles.Remove(style);
-
-                Assert.Equal(new Thickness(0), child.BorderThickness);
+                UnitTestApplication.Current.Exit();
+                Assert.True(target.IsClosed);
             }
         }
 
         private FuncControlTemplate<TestTopLevel> CreateTemplate()
         {
-            return new FuncControlTemplate<TestTopLevel>((x, scope) =>
+            return new FuncControlTemplate<TestTopLevel>(x =>
                 new ContentPresenter
                 {
                     Name = "PART_ContentPresenter",
                     [!ContentPresenter.ContentProperty] = x[!ContentControl.ContentProperty],
-                }.RegisterInNameScope(scope));
+                });
         }
 
         private class TestTopLevel : TopLevel
         {
-            private readonly ILayoutManager _layoutManager;
             public bool IsClosed { get; private set; }
 
-            public TestTopLevel(ITopLevelImpl impl, ILayoutManager layoutManager = null)
+            public TestTopLevel(ITopLevelImpl impl)
                 : base(impl)
             {
-                _layoutManager = layoutManager ?? new LayoutManager(this);
             }
 
-            protected override ILayoutManager CreateLayoutManager() => _layoutManager;
+            protected override void HandleApplicationExiting()
+            {
+                base.HandleApplicationExiting();
+                IsClosed = true;
+            }
         }
     }
 }

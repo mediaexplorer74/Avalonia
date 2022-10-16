@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using Avalonia.Media;
 using CoreGraphics;
 using UIKit;
@@ -12,9 +14,9 @@ namespace Avalonia.iOS
 
         public static Point ToAvalonia(this CGPoint point) => new Point(point.X, point.Y);
 
-        static float ColorComponent(byte c) => (float) c / 255;
+        static nfloat ColorComponent(byte c) => ((float) c) / 255;
 
-        public static UIColor ToUiColor(this Color color) => new UIColor(
+        public static UIColor ToUiColor(this Color color)=>new UIColor(
             ColorComponent(color.R),
             ColorComponent(color.G),
             ColorComponent(color.B),

@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,12 +18,12 @@ namespace Avalonia.Threading
     public class Dispatcher : IDispatcher
     {
         private readonly JobRunner _jobRunner;
-        private IPlatformThreadingInterface? _platform;
+        private IPlatformThreadingInterface _platform;
 
         public static Dispatcher UIThread { get; } =
             new Dispatcher(AvaloniaLocator.Current.GetService<IPlatformThreadingInterface>());
 
-        public Dispatcher(IPlatformThreadingInterface? platform)
+        public Dispatcher(IPlatformThreadingInterface platform)
         {
             _platform = platform;
             _jobRunner = new JobRunner(platform);
@@ -56,8 +59,8 @@ namespace Avalonia.Threading
         /// </param>
         public void MainLoop(CancellationToken cancellationToken)
         {
-            var platform = AvaloniaLocator.Current.GetRequiredService<IPlatformThreadingInterface>();
-            cancellationToken.Register(() => platform.Signal(DispatcherPriority.Send));
+            var platform = AvaloniaLocator.Current.GetService<IPlatformThreadingInterface>();
+            cancellationToken.Register(platform.Signal);
             platform.RunLoop(cancellationToken);
         }
 
@@ -66,75 +69,19 @@ namespace Avalonia.Threading
         /// </summary>
         public void RunJobs()
         {
-            _jobRunner.RunJobs(null);
-        }
-
-        /// <summary>
-        /// Use this method to ensure that more prioritized tasks are executed
-        /// </summary>
-        /// <param name="minimumPriority"></param>
-        public void RunJobs(DispatcherPriority minimumPriority) => _jobRunner.RunJobs(minimumPriority);
-        
-        /// <summary>
-        /// Use this method to check if there are more prioritized tasks
-        /// </summary>
-        /// <param name="minimumPriority"></param>
-        public bool HasJobsWithPriority(DispatcherPriority minimumPriority) =>
-            _jobRunner.HasJobsWithPriority(minimumPriority);
-
-        /// <inheritdoc/>
-        public Task InvokeAsync(Action action, DispatcherPriority priority = default)
-        {
-            _ = action ?? throw new ArgumentNullException(nameof(action));
-            return _jobRunner.InvokeAsync(action, priority);
+            _jobRunner?.RunJobs();
         }
 
         /// <inheritdoc/>
-        public Task<TResult> InvokeAsync<TResult>(Func<TResult> function, DispatcherPriority priority = default)
+        public Task InvokeTaskAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
         {
-            _ = function ?? throw new ArgumentNullException(nameof(function));
-            return _jobRunner.InvokeAsync(function, priority);
+            return _jobRunner?.InvokeAsync(action, priority);
         }
 
         /// <inheritdoc/>
-        public Task InvokeAsync(Func<Task> function, DispatcherPriority priority = default)
+        public void InvokeAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
         {
-            _ = function ?? throw new ArgumentNullException(nameof(function));
-            return _jobRunner.InvokeAsync(function, priority).Unwrap();
-        }
-
-        /// <inheritdoc/>
-        public Task<TResult> InvokeAsync<TResult>(Func<Task<TResult>> function, DispatcherPriority priority = default)
-        {
-            _ = function ?? throw new ArgumentNullException(nameof(function));
-            return _jobRunner.InvokeAsync(function, priority).Unwrap();
-        }
-
-        /// <inheritdoc/>
-        public void Post(Action action, DispatcherPriority priority = default)
-        {
-            _ = action ?? throw new ArgumentNullException(nameof(action));
-            _jobRunner.Post(action, priority);
-        }
-
-        /// <inheritdoc/>
-        public void Post(SendOrPostCallback action, object? arg, DispatcherPriority priority = default)
-        {
-            _ = action ?? throw new ArgumentNullException(nameof(action));
-            _jobRunner.Post(action, arg, priority);
-        }
-
-        /// <summary>
-        /// This is needed for platform backends that don't have internal priority system (e. g. win32)
-        /// To ensure that there are no jobs with higher priority
-        /// </summary>
-        /// <param name="currentPriority"></param>
-        internal void EnsurePriority(DispatcherPriority currentPriority)
-        {
-            if (currentPriority == DispatcherPriority.MaxValue)
-                return;
-            currentPriority += 1;
-            _jobRunner.RunJobs(currentPriority);
+            _jobRunner?.Post(action, priority);
         }
 
         /// <summary>

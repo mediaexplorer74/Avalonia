@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Reactive.Disposables;
 using Avalonia.Platform;
@@ -9,16 +12,18 @@ namespace Avalonia.Threading
     /// </summary>
     public class DispatcherTimer
     {
-        private IDisposable? _timer;
+        private IDisposable _timer;
 
         private readonly DispatcherPriority _priority;
 
         private TimeSpan _interval;
 
+        private readonly Action _raiseTickAction;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="DispatcherTimer"/> class.
         /// </summary>
-        public DispatcherTimer() : this(DispatcherPriority.Background)
+        public DispatcherTimer() : this(DispatcherPriority.Normal)
         {
         }
 
@@ -29,6 +34,7 @@ namespace Avalonia.Threading
         public DispatcherTimer(DispatcherPriority priority)
         {
             _priority = priority;
+            _raiseTickAction = RaiseTick;
         }
 
         /// <summary>
@@ -58,7 +64,7 @@ namespace Avalonia.Threading
         /// <summary>
         /// Raised when the timer ticks.
         /// </summary>
-        public event EventHandler? Tick;
+        public event EventHandler Tick;
 
         /// <summary>
         /// Gets or sets the interval at which the timer ticks.
@@ -108,7 +114,7 @@ namespace Avalonia.Threading
         /// <summary>
         /// Gets or sets user-defined data associated with the timer.
         /// </summary>
-        public object? Tag
+        public object Tag
         {
             get;
             set;
@@ -123,7 +129,7 @@ namespace Avalonia.Threading
         /// <param name="interval">The interval at which to tick.</param>
         /// <param name="priority">The priority to use.</param>
         /// <returns>An <see cref="IDisposable"/> used to cancel the timer.</returns>
-        public static IDisposable Run(Func<bool> action, TimeSpan interval, DispatcherPriority priority = default)
+        public static IDisposable Run(Func<bool> action, TimeSpan interval, DispatcherPriority priority = DispatcherPriority.Normal)
         {
             var timer = new DispatcherTimer(priority) { Interval = interval };
 
@@ -152,10 +158,8 @@ namespace Avalonia.Threading
         public static IDisposable RunOnce(
             Action action,
             TimeSpan interval,
-            DispatcherPriority priority = default)
+            DispatcherPriority priority = DispatcherPriority.Normal)
         {
-            interval = (interval != TimeSpan.Zero) ? interval : TimeSpan.FromTicks(1);
-            
             var timer = new DispatcherTimer(priority) { Interval = interval };
 
             timer.Tick += (s, e) =>
@@ -176,14 +180,14 @@ namespace Avalonia.Threading
         {
             if (!IsEnabled)
             {
-                var threading = AvaloniaLocator.Current.GetService<IPlatformThreadingInterface>();
+                IPlatformThreadingInterface threading = AvaloniaLocator.Current.GetService<IPlatformThreadingInterface>();
 
                 if (threading == null)
                 {
                     throw new Exception("Could not start timer: IPlatformThreadingInterface is not registered.");
                 }
 
-                _timer = threading.StartTimer(_priority, Interval, InternalTick);
+                _timer = threading.StartTimer(Interval, InternalTick);
             }
         }
 
@@ -194,19 +198,26 @@ namespace Avalonia.Threading
         {
             if (IsEnabled)
             {
-                _timer!.Dispose();
+                _timer.Dispose();
                 _timer = null;
             }
         }
 
-
+        
 
         /// <summary>
         /// Raises the <see cref="Tick"/> event on the dispatcher thread.
         /// </summary>
         private void InternalTick()
         {
-            Dispatcher.UIThread.EnsurePriority(_priority);
+            Dispatcher.UIThread.InvokeAsync(_raiseTickAction, _priority);
+        }
+
+        /// <summary>
+        /// Raises the <see cref="Tick"/> event.
+        /// </summary>
+        private void RaiseTick()
+        {
             Tick?.Invoke(this, EventArgs.Empty);
         }
     }

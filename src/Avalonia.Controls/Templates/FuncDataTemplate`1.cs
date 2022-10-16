@@ -1,6 +1,7 @@
-using System;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
 
-using Avalonia.Utilities;
+using System;
 
 namespace Avalonia.Controls.Templates
 {
@@ -17,26 +18,8 @@ namespace Avalonia.Controls.Templates
         /// A function which when passed an object of <typeparamref name="T"/> returns a control.
         /// </param>
         /// <param name="supportsRecycling">Whether the control can be recycled.</param>
-        public FuncDataTemplate(Func<T, INameScope, IControl?> build, bool supportsRecycling = false)
-            : base(o => TypeUtilities.CanCast<T>(o), CastBuild(build), supportsRecycling)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="FuncDataTemplate{T}"/> class.
-        /// </summary>
-        /// <param name="match">
-        /// A function which determines whether the data template matches the specified data.
-        /// </param>
-        /// <param name="build">
-        /// A function which when passed an object of <typeparamref name="T"/> returns a control.
-        /// </param>
-        /// <param name="supportsRecycling">Whether the control can be recycled.</param>
-        public FuncDataTemplate(
-            Func<T, bool> match,
-            Func<T, INameScope, IControl> build,
-            bool supportsRecycling = false)
-            : base(CastMatch(match), CastBuild(build), supportsRecycling)
+        public FuncDataTemplate(Func<T, IControl> build, bool supportsRecycling = false)
+            : base(typeof(T), CastBuild(build), supportsRecycling)
         {
         }
 
@@ -54,29 +37,29 @@ namespace Avalonia.Controls.Templates
             Func<T, bool> match,
             Func<T, IControl> build,
             bool supportsRecycling = false)
-            : this(match, (a, _) => build(a), supportsRecycling)
+            : base(CastMatch(match), CastBuild(build), supportsRecycling)
         {
         }
 
         /// <summary>
-        /// Casts a strongly typed match function to a weakly typed one.
+        /// Casts a stongly typed match function to a weakly typed one.
         /// </summary>
         /// <param name="f">The strongly typed function.</param>
         /// <returns>The weakly typed function.</returns>
-        private static Func<object?, bool> CastMatch(Func<T, bool> f)
+        private static Func<object, bool> CastMatch(Func<T, bool> f)
         {
-            return o => TypeUtilities.CanCast<T>(o) && f((T)o!);
+            return o => (o is T) && f((T)o);
         }
 
         /// <summary>
-        /// Casts a strongly typed build function to a weakly typed one.
+        /// Casts a stongly typed build function to a weakly typed one.
         /// </summary>
         /// <typeparam name="TResult">The strong data type.</typeparam>
         /// <param name="f">The strongly typed function.</param>
         /// <returns>The weakly typed function.</returns>
-        private static Func<object?, INameScope, TResult> CastBuild<TResult>(Func<T, INameScope, TResult> f)
+        private static Func<object, TResult> CastBuild<TResult>(Func<T, TResult> f)
         {
-            return (o, s) => f((T)o!, s);
+            return o => f((T)o);
         }
     }
 }

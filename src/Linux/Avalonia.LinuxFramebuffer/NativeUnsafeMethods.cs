@@ -1,8 +1,8 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿using __u32 = System.UInt32;
 using __s32 = System.Int32;
 using __u16 = System.UInt16;
-using __u32 = System.UInt32;
+using System;
+using System.Runtime.InteropServices;
 // ReSharper disable FieldCanBeMadeReadOnly.Local
 // ReSharper disable ArrangeTypeMemberModifiers
 // ReSharper disable BuiltInTypeReferenceStyle
@@ -33,10 +33,6 @@ namespace Avalonia.LinuxFramebuffer
         [DllImport("libc", EntryPoint = "select", SetLastError = true)]
         public static extern int select(int nfds, void* rfds, void* wfds, void* exfds, IntPtr* timevals);
 
-
-        [DllImport("libc", EntryPoint = "poll", SetLastError = true)]
-        public static extern int poll(pollfd* fds, IntPtr nfds, int timeout);
-
         [DllImport("libevdev.so.2", EntryPoint = "libevdev_new_from_fd", SetLastError = true)]
         public static extern int libevdev_new_from_fd(int fd, out IntPtr dev);
 
@@ -50,28 +46,8 @@ namespace Avalonia.LinuxFramebuffer
         public static extern IntPtr libevdev_get_name(IntPtr dev);
         [DllImport("libevdev.so.2", EntryPoint = "libevdev_get_abs_info", SetLastError = true)]
         public static extern input_absinfo* libevdev_get_abs_info(IntPtr dev, int code);
-        
-        [DllImport("libc")]
-        public extern static int epoll_create1(int size);
-
-        [DllImport("libc")]
-        public extern static int epoll_ctl(int epfd, int op, int fd, ref epoll_event __event);
-
-        [DllImport("libc")]
-        public extern static int epoll_wait(int epfd, epoll_event* events, int maxevents, int timeout);
-        
-        public const int EPOLLIN = 1;
-        public const int EPOLL_CTL_ADD = 1;
-        public const int O_NONBLOCK = 2048;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    struct pollfd {
-        public int   fd;         /* file descriptor */
-        public short events;     /* requested events */
-        public short revents;    /* returned events */
-    };
-    
     enum FbIoCtl : uint
     {
         FBIOGET_VSCREENINFO = 0x4600,
@@ -93,10 +69,9 @@ namespace Avalonia.LinuxFramebuffer
         FB_VBLANK_HAVE_VCOUNT = 0x020 /* the vcount field is valid */,
         FB_VBLANK_HAVE_HCOUNT = 0x040 /* the hcount field is valid */,
         FB_VBLANK_VSYNCING = 0x080 /* currently in a vsync */,
-        FB_VBLANK_HAVE_VSYNC = 0x100 /* vertical syncs can be detected */
+        FB_VBLANK_HAVE_VSYNC = 0x100 /* verical syncs can be detected */
     }
 
-    [StructLayout(LayoutKind.Sequential)]
     unsafe struct fb_vblank {
         public VBlankFlags flags;			/* FB_VBLANK flags */
         __u32 count;			/* counter of retraces since boot */
@@ -203,29 +178,16 @@ namespace Avalonia.LinuxFramebuffer
     [StructLayout(LayoutKind.Sequential)]
     struct input_event
     {
-        private IntPtr timeval1, timeval2;
-        public ushort _type, _code;
+        private IntPtr crap1, crap2;
+        public ushort type, code;
         public int value;
-        public EvType Type => (EvType)_type;
-        public EvKey Key => (EvKey)_code;
-        public AbsAxis Axis => (AbsAxis)_code;
-
-        public ulong Timestamp
-        {
-            get
-            {
-                var ms = (ulong)timeval2.ToInt64() / 1000;
-                var s = (ulong)timeval1.ToInt64() * 1000;
-                return s + ms;
-            }
-        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
     unsafe struct fd_set
     {
         public int count;
-        public fixed byte fds [256];
+        public fixed int fds [256];
     }
 
     enum AxisEventCode
@@ -275,8 +237,7 @@ namespace Avalonia.LinuxFramebuffer
     {
         BTN_LEFT = 0x110,
         BTN_RIGHT = 0x111,
-        BTN_MIDDLE = 0x112,
-        BTN_TOUCH = 0x14a
+        BTN_MIDDLE = 0x112
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -289,25 +250,5 @@ namespace Avalonia.LinuxFramebuffer
         public __s32 flat;
         public __s32 resolution;
 
-    }
-    
-    [StructLayout(LayoutKind.Explicit)]
-    struct epoll_data
-    {
-        [FieldOffset(0)]
-        public IntPtr ptr;
-        [FieldOffset(0)]
-        public int fd;
-        [FieldOffset(0)]
-        public uint u32;
-        [FieldOffset(0)]
-        public ulong u64;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct epoll_event
-    {
-        public uint events;
-        public epoll_data data;
     }
 }

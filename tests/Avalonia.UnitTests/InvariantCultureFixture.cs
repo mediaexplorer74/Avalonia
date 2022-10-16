@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System;
 using System.Globalization;
 using System.Threading;
 
@@ -17,22 +20,13 @@ namespace Avalonia.UnitTests
 
         public InvariantCultureFixture()
         {
-#if NET461
-            _restore = Thread.CurrentThread.CurrentCulture;
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-#else
-            _restore = CultureInfo.CurrentCulture;
-            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-#endif
+            _restore = CultureInfo.CurrentUICulture;
+            CultureInfo.CurrentUICulture = CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
         }
 
         public void Dispose()
         {
-#if NET461
-            Thread.CurrentThread.CurrentCulture = _restore;
-#else
-            CultureInfo.CurrentCulture = _restore;
-#endif
+            CultureInfo.CurrentUICulture = CultureInfo.CurrentCulture = _restore;
         }
     }
 }

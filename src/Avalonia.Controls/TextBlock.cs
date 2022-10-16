@@ -1,100 +1,79 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
-using Avalonia.Automation.Peers;
-using Avalonia.Controls.Documents;
-using Avalonia.Layout;
+using System.Reactive;
+using System.Reactive.Linq;
+using Avalonia.Data;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
-using Avalonia.Media.TextFormatting;
 using Avalonia.Metadata;
-using Avalonia.Utilities;
 
 namespace Avalonia.Controls
 {
     /// <summary>
     /// A control that displays a block of text.
     /// </summary>
-    public class TextBlock : Control, IAddChild<string>
+    public class TextBlock : Control
     {
         /// <summary>
         /// Defines the <see cref="Background"/> property.
         /// </summary>
-        public static readonly StyledProperty<IBrush?> BackgroundProperty =
+        public static readonly StyledProperty<IBrush> BackgroundProperty =
             Border.BackgroundProperty.AddOwner<TextBlock>();
 
-        /// <summary>
-        /// Defines the <see cref="Padding"/> property.
-        /// </summary>
-        public static readonly StyledProperty<Thickness> PaddingProperty =
-            Decorator.PaddingProperty.AddOwner<TextBlock>();
+        // TODO: Define these attached properties elswhere (e.g. on a Text class) and AddOwner
+        // them into TextBlock.
 
         /// <summary>
         /// Defines the <see cref="FontFamily"/> property.
         /// </summary>
-        public static readonly StyledProperty<FontFamily> FontFamilyProperty =
-            TextElement.FontFamilyProperty.AddOwner<TextBlock>();
+        public static readonly AttachedProperty<string> FontFamilyProperty =
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, string>(
+                nameof(FontFamily),
+                defaultValue: "Courier New",
+                inherits: true);
 
         /// <summary>
         /// Defines the <see cref="FontSize"/> property.
         /// </summary>
-        public static readonly StyledProperty<double> FontSizeProperty =
-            TextElement.FontSizeProperty.AddOwner<TextBlock>();
+        public static readonly AttachedProperty<double> FontSizeProperty =
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, double>(
+                nameof(FontSize),
+                defaultValue: 12,
+                inherits: true);
 
         /// <summary>
         /// Defines the <see cref="FontStyle"/> property.
         /// </summary>
-        public static readonly StyledProperty<FontStyle> FontStyleProperty =
-            TextElement.FontStyleProperty.AddOwner<TextBlock>();
+        public static readonly AttachedProperty<FontStyle> FontStyleProperty =
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, FontStyle>(
+                nameof(FontStyle),
+                inherits: true);
 
         /// <summary>
         /// Defines the <see cref="FontWeight"/> property.
         /// </summary>
-        public static readonly StyledProperty<FontWeight> FontWeightProperty =
-            TextElement.FontWeightProperty.AddOwner<TextBlock>();
-
-        /// <summary>
-        /// Defines the <see cref="FontWeight"/> property.
-        /// </summary>
-        public static readonly StyledProperty<FontStretch> FontStretchProperty =
-            TextElement.FontStretchProperty.AddOwner<TextBlock>();
+        public static readonly AttachedProperty<FontWeight> FontWeightProperty =
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, FontWeight>(
+                nameof(FontWeight),
+                inherits: true,
+                defaultValue: FontWeight.Normal);
 
         /// <summary>
         /// Defines the <see cref="Foreground"/> property.
         /// </summary>
-        public static readonly StyledProperty<IBrush?> ForegroundProperty =
-            TextElement.ForegroundProperty.AddOwner<TextBlock>();
-
-        /// <summary>
-        /// DependencyProperty for <see cref="BaselineOffset" /> property.
-        /// </summary>
-        public static readonly AttachedProperty<double> BaselineOffsetProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, double>(
-                nameof(BaselineOffset),
-                0,
-                true);
-
-        /// <summary>
-        /// Defines the <see cref="LineHeight"/> property.
-        /// </summary>
-        public static readonly AttachedProperty<double> LineHeightProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, double>(
-                nameof(LineHeight),
-                double.NaN,
-                validate: IsValidLineHeight,
-                inherits: true);
-
-        /// <summary>
-        /// Defines the <see cref="MaxLines"/> property.
-        /// </summary>
-        public static readonly AttachedProperty<int> MaxLinesProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, int>(
-                nameof(MaxLines),
-                validate: IsValidMaxLines,
+        public static readonly AttachedProperty<IBrush> ForegroundProperty =
+            AvaloniaProperty.RegisterAttached<TextBlock, Control, IBrush>(
+                nameof(Foreground),
+                new SolidColorBrush(0xff000000),
                 inherits: true);
 
         /// <summary>
         /// Defines the <see cref="Text"/> property.
         /// </summary>
-        public static readonly DirectProperty<TextBlock, string?> TextProperty =
-            AvaloniaProperty.RegisterDirect<TextBlock, string?>(
+        public static readonly DirectProperty<TextBlock, string> TextProperty =
+            AvaloniaProperty.RegisterDirect<TextBlock, string>(
                 nameof(Text),
                 o => o.Text,
                 (o, v) => o.Text = v);
@@ -102,36 +81,18 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="TextAlignment"/> property.
         /// </summary>
-        public static readonly AttachedProperty<TextAlignment> TextAlignmentProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextAlignment>(
-                nameof(TextAlignment), 
-                defaultValue: TextAlignment.Start,
-                inherits: true);
+        public static readonly StyledProperty<TextAlignment> TextAlignmentProperty =
+            AvaloniaProperty.Register<TextBlock, TextAlignment>(nameof(TextAlignment));
 
         /// <summary>
         /// Defines the <see cref="TextWrapping"/> property.
         /// </summary>
-        public static readonly AttachedProperty<TextWrapping> TextWrappingProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextWrapping>(nameof(TextWrapping), 
-                inherits: true);
+        public static readonly StyledProperty<TextWrapping> TextWrappingProperty =
+            AvaloniaProperty.Register<TextBlock, TextWrapping>(nameof(TextWrapping));
 
-        /// <summary>
-        /// Defines the <see cref="TextTrimming"/> property.
-        /// </summary>
-        public static readonly AttachedProperty<TextTrimming> TextTrimmingProperty =
-            AvaloniaProperty.RegisterAttached<TextBlock, Control, TextTrimming>(nameof(TextTrimming), 
-                defaultValue: TextTrimming.None,
-                inherits: true);
-
-        /// <summary>
-        /// Defines the <see cref="TextDecorations"/> property.
-        /// </summary>
-        public static readonly StyledProperty<TextDecorationCollection?> TextDecorationsProperty =
-            AvaloniaProperty.Register<TextBlock, TextDecorationCollection?>(nameof(TextDecorations));
-
-        internal string? _text;
-        protected TextLayout? _textLayout;
-        protected Size _constraint;
+        private string _text;
+        private FormattedText _formattedText;
+        private Size _constraint;
 
         /// <summary>
         /// Initializes static members of the <see cref="TextBlock"/> class.
@@ -139,34 +100,33 @@ namespace Avalonia.Controls
         static TextBlock()
         {
             ClipToBoundsProperty.OverrideDefaultValue<TextBlock>(true);
-            
-            AffectsRender<TextBlock>(BackgroundProperty, ForegroundProperty);
+            AffectsRender(ForegroundProperty);
+            AffectsRender(FontWeightProperty);
+            AffectsRender(FontSizeProperty);
+            AffectsRender(FontStyleProperty);
         }
 
         /// <summary>
-        /// Gets the <see cref="TextLayout"/> used to render the text.
+        /// Initializes a new instance of the <see cref="TextBlock"/> class.
         /// </summary>
-        public TextLayout TextLayout
+        public TextBlock()
         {
-            get
-            {
-                return _textLayout ??= CreateTextLayout(_text);
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the padding to place around the <see cref="Text"/>.
-        /// </summary>
-        public Thickness Padding
-        {
-            get { return GetValue(PaddingProperty); }
-            set { SetValue(PaddingProperty, value); }
+            Observable.Merge(
+                this.GetObservable(TextProperty).Select(_ => Unit.Default),
+                this.GetObservable(TextAlignmentProperty).Select(_ => Unit.Default),
+                this.GetObservable(FontSizeProperty).Select(_ => Unit.Default),
+                this.GetObservable(FontStyleProperty).Select(_ => Unit.Default),
+                this.GetObservable(FontWeightProperty).Select(_ => Unit.Default))
+                .Subscribe(_ =>
+                {
+                    InvalidateFormattedText();
+                });
         }
 
         /// <summary>
         /// Gets or sets a brush used to paint the control's background.
         /// </summary>
-        public IBrush? Background
+        public IBrush Background
         {
             get { return GetValue(BackgroundProperty); }
             set { SetValue(BackgroundProperty, value); }
@@ -175,23 +135,24 @@ namespace Avalonia.Controls
         /// <summary>
         /// Gets or sets the text.
         /// </summary>
-        public string? Text
+        [Content]
+        public string Text
         {
-            get => GetText();
-            set => SetText(value);
+            get { return _text; }
+            set { SetAndRaise(TextProperty, ref _text, value); }
         }
 
         /// <summary>
-        /// Gets or sets the font family used to draw the control's text.
+        /// Gets or sets the font family.
         /// </summary>
-        public FontFamily FontFamily
+        public string FontFamily
         {
             get { return GetValue(FontFamilyProperty); }
             set { SetValue(FontFamilyProperty, value); }
         }
 
         /// <summary>
-        /// Gets or sets the size of the control's text in points.
+        /// Gets or sets the font size.
         /// </summary>
         public double FontSize
         {
@@ -200,7 +161,7 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Gets or sets the font style used to draw the control's text.
+        /// Gets or sets the font style.
         /// </summary>
         public FontStyle FontStyle
         {
@@ -209,7 +170,7 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Gets or sets the font weight used to draw the control's text.
+        /// Gets or sets the font weight.
         /// </summary>
         public FontWeight FontWeight
         {
@@ -218,39 +179,28 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Gets or sets the font stretch used to draw the control's text.
+        /// Gets or sets a brush used to paint the text.
         /// </summary>
-        public FontStretch FontStretch
-        {
-            get { return GetValue(FontStretchProperty); }
-            set { SetValue(FontStretchProperty, value); }
-        }
-
-        /// <summary>
-        /// Gets or sets the brush used to draw the control's text and other foreground elements.
-        /// </summary>
-        public IBrush? Foreground
+        public IBrush Foreground
         {
             get { return GetValue(ForegroundProperty); }
             set { SetValue(ForegroundProperty, value); }
         }
 
         /// <summary>
-        /// Gets or sets the height of each line of content.
+        /// Gets the <see cref="FormattedText"/> used to render the text.
         /// </summary>
-        public double LineHeight
+        public FormattedText FormattedText
         {
-            get => GetValue(LineHeightProperty);
-            set => SetValue(LineHeightProperty, value);
-        }
+            get
+            {
+                if (_formattedText == null)
+                {
+                    _formattedText = CreateFormattedText(_constraint);
+                }
 
-        /// <summary>
-        /// Gets or sets the maximum number of text lines.
-        /// </summary>
-        public int MaxLines
-        {
-            get => GetValue(MaxLinesProperty);
-            set => SetValue(MaxLinesProperty, value);
+                return _formattedText;
+            }
         }
 
         /// <summary>
@@ -263,15 +213,6 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Gets or sets the control's text trimming mode.
-        /// </summary>
-        public TextTrimming TextTrimming
-        {
-            get { return GetValue(TextTrimmingProperty); }
-            set { SetValue(TextTrimmingProperty, value); }
-        }
-
-        /// <summary>
         /// Gets or sets the text alignment.
         /// </summary>
         public TextAlignment TextAlignment
@@ -281,197 +222,108 @@ namespace Avalonia.Controls
         }
 
         /// <summary>
-        /// Gets or sets the text decorations.
+        /// Gets the value of the attached <see cref="FontFamilyProperty"/> on a control.
         /// </summary>
-        public TextDecorationCollection? TextDecorations
+        /// <param name="control">The control.</param>
+        /// <returns>The font family.</returns>
+        public static string GetFontFamily(Control control)
         {
-            get => GetValue(TextDecorationsProperty);
-            set => SetValue(TextDecorationsProperty, value);
-        }
-        
-        protected override bool BypassFlowDirectionPolicies => true;
-
-        /// <summary>
-        /// The BaselineOffset property provides an adjustment to baseline offset
-        /// </summary>
-        public double BaselineOffset
-        {
-            get { return (double)GetValue(BaselineOffsetProperty); }
-            set { SetValue(BaselineOffsetProperty, value); }
+            return control.GetValue(FontFamilyProperty);
         }
 
         /// <summary>
-        /// Reads the attached property from the given element
+        /// Gets the value of the attached <see cref="FontSizeProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to read the attached property.</param>
-        public static double GetBaselineOffset(Control control)
+        /// <param name="control">The control.</param>
+        /// <returns>The font family.</returns>
+        public static double GetFontSize(Control control)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            return control.GetValue(BaselineOffsetProperty);
+            return control.GetValue(FontSizeProperty);
         }
 
         /// <summary>
-        /// Writes the attached property BaselineOffset to the given element.
+        /// Gets the value of the attached <see cref="FontStyleProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to write the attached property.</param>
-        /// <param name="value">The property value to set</param>
-        public static void SetBaselineOffset(Control control, double value)
+        /// <param name="control">The control.</param>
+        /// <returns>The font family.</returns>
+        public static FontStyle GetFontStyle(Control control)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            control.SetValue(BaselineOffsetProperty, value);
+            return control.GetValue(FontStyleProperty);
         }
 
         /// <summary>
-        /// Reads the attached property from the given element
+        /// Gets the value of the attached <see cref="FontWeightProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to read the attached property.</param>
-        public static TextAlignment GetTextAlignment(Control control)
+        /// <param name="control">The control.</param>
+        /// <returns>The font family.</returns>
+        public static FontWeight GetFontWeight(Control control)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            return control.GetValue(TextAlignmentProperty);
+            return control.GetValue(FontWeightProperty);
         }
 
         /// <summary>
-        /// Writes the attached property BaselineOffset to the given element.
+        /// Gets the value of the attached <see cref="ForegroundProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to write the attached property.</param>
-        /// <param name="alignment">The property value to set</param>
-        public static void SetTextAlignment(Control control, TextAlignment alignment)
+        /// <param name="control">The control.</param>
+        /// <returns>The foreground.</returns>
+        public static IBrush GetForeground(Control control)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            control.SetValue(TextAlignmentProperty, alignment);
+            return control.GetValue(ForegroundProperty);
         }
 
         /// <summary>
-        /// Reads the attached property from the given element
+        /// Sets the value of the attached <see cref="FontFamilyProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to read the attached property.</param>
-        public static TextWrapping GetTextWrapping(Control control)
+        /// <param name="control">The control.</param>
+        /// <param name="value">The property value to set.</param>
+        /// <returns>The font family.</returns>
+        public static void SetFontFamily(Control control, string value)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            return control.GetValue(TextWrappingProperty);
+            control.SetValue(FontFamilyProperty, value);
         }
 
         /// <summary>
-        /// Writes the attached property BaselineOffset to the given element.
+        /// Sets the value of the attached <see cref="FontSizeProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to write the attached property.</param>
-        /// <param name="wrapping">The property value to set</param>
-        public static void SetTextWrapping(Control control, TextWrapping wrapping)
+        /// <param name="control">The control.</param>
+        /// <param name="value">The property value to set.</param>
+        /// <returns>The font family.</returns>
+        public static void SetFontSize(Control control, double value)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            control.SetValue(TextWrappingProperty, wrapping);
+            control.SetValue(FontSizeProperty, value);
         }
 
         /// <summary>
-        /// Reads the attached property from the given element
+        /// Sets the value of the attached <see cref="FontStyleProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to read the attached property.</param>
-        public static TextTrimming GetTextTrimming(Control control)
+        /// <param name="control">The control.</param>
+        /// <param name="value">The property value to set.</param>
+        /// <returns>The font family.</returns>
+        public static void SetFontStyle(Control control, FontStyle value)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            return control.GetValue(TextTrimmingProperty);
+            control.SetValue(FontStyleProperty, value);
         }
 
         /// <summary>
-        /// Writes the attached property BaselineOffset to the given element.
+        /// Sets the value of the attached <see cref="FontWeightProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to write the attached property.</param>
-        /// <param name="trimming">The property value to set</param>
-        public static void SetTextTrimming(Control control, TextTrimming trimming)
+        /// <param name="control">The control.</param>
+        /// <param name="value">The property value to set.</param>
+        /// <returns>The font family.</returns>
+        public static void SetFontWeight(Control control, FontWeight value)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            control.SetValue(TextTrimmingProperty, trimming);
+            control.SetValue(FontWeightProperty, value);
         }
 
         /// <summary>
-        /// Reads the attached property from the given element
+        /// Sets the value of the attached <see cref="ForegroundProperty"/> on a control.
         /// </summary>
-        /// <param name="control">The element to which to read the attached property.</param>
-        public static double GetLineHeight(Control control)
+        /// <param name="control">The control.</param>
+        /// <param name="value">The property value to set.</param>
+        /// <returns>The font family.</returns>
+        public static void SetForeground(Control control, IBrush value)
         {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            return control.GetValue(LineHeightProperty);
-        }
-
-        /// <summary>
-        /// Writes the attached property BaselineOffset to the given element.
-        /// </summary>
-        /// <param name="control">The element to which to write the attached property.</param>
-        /// <param name="height">The property value to set</param>
-        public static void SetLineHeight(Control control, double height)
-        {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            control.SetValue(LineHeightProperty, height);
-        }
-
-        /// <summary>
-        /// Reads the attached property from the given element
-        /// </summary>
-        /// <param name="control">The element to which to read the attached property.</param>
-        public static int GetMaxLines(Control control)
-        {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            return control.GetValue(MaxLinesProperty);
-        }
-
-        /// <summary>
-        /// Writes the attached property BaselineOffset to the given element.
-        /// </summary>
-        /// <param name="control">The element to which to write the attached property.</param>
-        /// <param name="maxLines">The property value to set</param>
-        public static void SetMaxLines(Control control, int maxLines)
-        {
-            if (control == null)
-            {
-                throw new ArgumentNullException(nameof(control));
-            }
-
-            control.SetValue(MaxLinesProperty, maxLines);
+            control.SetValue(ForegroundProperty, value);
         }
 
         /// <summary>
@@ -487,192 +339,69 @@ namespace Avalonia.Controls
                 context.FillRectangle(background, new Rect(Bounds.Size));
             }
 
-            var padding = Padding;
-            var top = padding.Top;
-            var textHeight = TextLayout.Bounds.Height;
+            FormattedText.Constraint = Bounds.Size;
+            context.DrawText(Foreground, new Point(), FormattedText);
+        }
 
-            if (Bounds.Height < textHeight)
+        /// <summary>
+        /// Creates the <see cref="FormattedText"/> used to render the text.
+        /// </summary>
+        /// <param name="constraint">The constraint of the text.</param>
+        /// <returns>A <see cref="FormattedText"/> object.</returns>
+        protected virtual FormattedText CreateFormattedText(Size constraint)
+        {
+            return new FormattedText
             {
-                switch (VerticalAlignment)
-                {
-                    case VerticalAlignment.Center:
-                        top += (Bounds.Height - textHeight) / 2;
-                        break;
+                Constraint = constraint,
+                Typeface = new Typeface(FontFamily, FontSize, FontStyle, FontWeight),
+                Text = Text ?? string.Empty,
+                TextAlignment = TextAlignment,
+                Wrapping = TextWrapping,
+            };
+        }
 
-                    case VerticalAlignment.Bottom:
-                        top += (Bounds.Height - textHeight);
-                        break;
-                }
+        /// <summary>
+        /// Invalidates <see cref="FormattedText"/>.
+        /// </summary>
+        protected void InvalidateFormattedText()
+        {
+            if (_formattedText != null)
+            {
+                _constraint = _formattedText.Constraint;
+                _formattedText = null;
             }
-
-            RenderTextLayout(context, new Point(padding.Left, top));
-        }
-
-        protected virtual void RenderTextLayout(DrawingContext context, Point origin)
-        {
-            TextLayout.Draw(context, origin);
-        }
-
-        void IAddChild<string>.AddChild(string text)
-        {
-            _text = text;
-        }
-
-        protected virtual string? GetText()
-        {
-            return _text;
-        }
-
-        protected virtual void SetText(string? text)
-        {
-            SetAndRaise(TextProperty, ref _text, text);
-        }
-
-        /// <summary>
-        /// Creates the <see cref="TextLayout"/> used to render the text.
-        /// </summary>
-        /// <returns>A <see cref="TextLayout"/> object.</returns>
-        protected virtual TextLayout CreateTextLayout(string? text)
-        {
-            var defaultProperties = new GenericTextRunProperties(
-                new Typeface(FontFamily, FontStyle, FontWeight, FontStretch),
-                FontSize,
-                TextDecorations,
-                Foreground);
-
-            var paragraphProperties = new GenericTextParagraphProperties(FlowDirection, TextAlignment, true, false,
-                defaultProperties, TextWrapping, LineHeight, 0);
-
-            return new TextLayout(
-                new SimpleTextSource((text ?? "").AsMemory(), defaultProperties),
-                paragraphProperties,
-                TextTrimming,
-                _constraint.Width,
-                _constraint.Height,
-                maxLines: MaxLines,
-                lineHeight: LineHeight);
-        }
-
-        /// <summary>
-        /// Invalidates <see cref="TextLayout"/>.
-        /// </summary>
-        protected void InvalidateTextLayout()
-        {
-            _textLayout = null;
 
             InvalidateMeasure();
         }
 
+        /// <summary>
+        /// Measures the control.
+        /// </summary>
+        /// <param name="availableSize">The available size for the control.</param>
+        /// <returns>The desired size.</returns>
         protected override Size MeasureOverride(Size availableSize)
         {
-            var scale = LayoutHelper.GetLayoutScale(this);
-
-            var padding = LayoutHelper.RoundLayoutThickness(Padding, scale, scale);
-
-            _constraint = availableSize.Deflate(padding);
-
-            _textLayout = null;
-
-            InvalidateArrange();
-
-            var measuredSize = TextLayout.Bounds.Size.Inflate(padding);
-
-            return measuredSize;
-        }
-
-        protected override Size ArrangeOverride(Size finalSize)
-        {
-            var textWidth = Math.Ceiling(TextLayout.Bounds.Width);
-
-            if(finalSize.Width < textWidth)
+            if (!string.IsNullOrEmpty(Text))
             {
-                finalSize = finalSize.WithWidth(textWidth);
-            }
-
-            if (MathUtilities.AreClose(_constraint.Width, finalSize.Width))
-            {
-                return finalSize;
-            }
-
-            var scale = LayoutHelper.GetLayoutScale(this);
-
-            var padding = LayoutHelper.RoundLayoutThickness(Padding, scale, scale);
-
-            _constraint = new Size(Math.Ceiling(finalSize.Deflate(padding).Width), double.PositiveInfinity);
-
-            _textLayout = null;
-
-            return finalSize;
-        }
-
-        protected override AutomationPeer OnCreateAutomationPeer()
-        {
-            return new TextBlockAutomationPeer(this);
-        }
-
-        private static bool IsValidMaxLines(int maxLines) => maxLines >= 0;
-
-        private static bool IsValidLineHeight(double lineHeight) => double.IsNaN(lineHeight) || lineHeight > 0;
-
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            switch (change.Property.Name)
-            {
-                case nameof (FontSize):
-                case nameof (FontWeight):
-                case nameof (FontStyle):
-                case nameof (FontFamily):
-                case nameof (FontStretch):
-
-                case nameof (TextWrapping):
-                case nameof (TextTrimming):
-                case nameof (TextAlignment):
-
-                case nameof (FlowDirection):
-
-                case nameof (Padding):
-                case nameof (LineHeight):
-                case nameof (MaxLines):
-
-                case nameof (Text):
-                case nameof (TextDecorations):
-                case nameof (Foreground):
+                if (TextWrapping == TextWrapping.Wrap)
                 {
-                    InvalidateTextLayout();
-                    break;
+                    FormattedText.Constraint = new Size(availableSize.Width, double.PositiveInfinity);
                 }
-            }
-        }
-
-        protected readonly struct SimpleTextSource : ITextSource
-        {
-            private readonly ReadOnlySlice<char> _text;
-            private readonly TextRunProperties _defaultProperties;
-
-            public SimpleTextSource(ReadOnlySlice<char> text, TextRunProperties defaultProperties)
-            {
-                _text = text;
-                _defaultProperties = defaultProperties;
-            }
-
-            public TextRun? GetTextRun(int textSourceIndex)
-            {
-                if (textSourceIndex > _text.Length)
+                else
                 {
-                    return new TextEndOfParagraph();
+                    FormattedText.Constraint = Size.Infinity;
                 }
 
-                var runText = _text.Skip(textSourceIndex);
-
-                if (runText.IsEmpty)
-                {
-                    return new TextEndOfParagraph();
-                }
-
-                return new TextCharacters(runText, _defaultProperties);
+                return FormattedText.Measure();
             }
+
+            return new Size();
+        }
+
+        protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToLogicalTree(e);
+            InvalidateFormattedText();
         }
     }
 }

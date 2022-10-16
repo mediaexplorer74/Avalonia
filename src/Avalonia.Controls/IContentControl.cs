@@ -1,6 +1,8 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
-using Avalonia.Metadata;
 
 namespace Avalonia.Controls
 {
@@ -8,18 +10,17 @@ namespace Avalonia.Controls
     /// Defines a control that displays <see cref="Content"/> according to a
     /// <see cref="Avalonia.Controls.Templates.FuncDataTemplate"/>.
     /// </summary>
-    [NotClientImplementable]
     public interface IContentControl : IControl
     {
         /// <summary>
         /// Gets or sets the content to display.
         /// </summary>
-        object? Content { get; set; }
+        object Content { get; set; }
 
         /// <summary>
         /// Gets or sets the data template used to display the content of the control.
         /// </summary>
-        IDataTemplate? ContentTemplate { get; set; }
+        IDataTemplate ContentTemplate { get; set; }
 
         /// <summary>
         /// Gets or sets the horizontal alignment of the content within the control.

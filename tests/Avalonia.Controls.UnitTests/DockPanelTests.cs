@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Xunit;
 
 namespace Avalonia.Controls.UnitTests
@@ -9,7 +12,7 @@ namespace Avalonia.Controls.UnitTests
         {
             var target = new DockPanel
             {
-                Children =
+                Children = new Controls
                 {
                     new Border { Width = 500, Height = 50, [DockPanel.DockProperty] = Dock.Top },
                     new Border { Width = 500, Height = 50, [DockPanel.DockProperty] = Dock.Bottom },
@@ -35,7 +38,7 @@ namespace Avalonia.Controls.UnitTests
         {
             var target = new DockPanel
             {
-                Children =
+                Children = new Controls
                 {
                     new Border { Width = 50, Height = 400, [DockPanel.DockProperty] = Dock.Left },
                     new Border { Width = 50, Height = 400, [DockPanel.DockProperty] = Dock.Right },
@@ -54,30 +57,6 @@ namespace Avalonia.Controls.UnitTests
             Assert.Equal(new Rect(50, 0, 500, 50), target.Children[2].Bounds);
             Assert.Equal(new Rect(50, 350, 500, 50), target.Children[3].Bounds);
             Assert.Equal(new Rect(50, 50, 500, 300), target.Children[4].Bounds);
-        }
-
-        [Fact]
-        public void Changing_Child_Dock_Invalidates_Measure()
-        {
-            Border child;
-            var target = new DockPanel
-            {
-                Children =
-                {
-                    (child = new Border
-                    {
-                        [DockPanel.DockProperty] = Dock.Left,
-                    }),
-                }
-            };
-
-            target.Measure(Size.Infinity);
-            target.Arrange(new Rect(target.DesiredSize));
-            Assert.True(target.IsMeasureValid);
-
-            DockPanel.SetDock(child, Dock.Right);
-
-            Assert.False(target.IsMeasureValid);
         }
     }
 }

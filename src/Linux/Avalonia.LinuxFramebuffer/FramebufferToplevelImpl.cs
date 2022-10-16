@@ -1,39 +1,27 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using Avalonia.Controls;
+using System.Text;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
-using Avalonia.LinuxFramebuffer.Input;
-using Avalonia.LinuxFramebuffer.Output;
 using Avalonia.Platform;
-using Avalonia.Rendering;
-using Avalonia.Rendering.Composition;
+using Avalonia.Threading;
 
 namespace Avalonia.LinuxFramebuffer
 {
-    class FramebufferToplevelImpl : ITopLevelImpl, IScreenInfoProvider
+    class FramebufferToplevelImpl : IEmbeddableWindowImpl
     {
-        private readonly IOutputBackend _outputBackend;
-        private readonly IInputBackend _inputBackend;
-
+        private readonly LinuxFramebuffer _fb;
+        private bool _renderQueued;
         public IInputRoot InputRoot { get; private set; }
 
-        public FramebufferToplevelImpl(IOutputBackend outputBackend, IInputBackend inputBackend)
+        public FramebufferToplevelImpl(LinuxFramebuffer fb)
         {
-            _outputBackend = outputBackend;
-            _inputBackend = inputBackend;
-
-            Surfaces = new object[] { _outputBackend };
-
+            _fb = fb;
             Invalidate(default(Rect));
-            _inputBackend.Initialize(this, e => Input?.Invoke(e));
-        }
-
-        public IRenderer CreateRenderer(IRenderRoot root)
-        {
-            var factory = AvaloniaLocator.Current.GetService<IRendererFactory>();
-            var renderLoop = AvaloniaLocator.Current.GetService<IRenderLoop>();
-            return factory?.Create(root, renderLoop) ?? new CompositingRenderer(root, LinuxFramebufferPlatform.Compositor);
+            var mice = new Mice(ClientSize.Width, ClientSize.Height);
+            mice.Start();
+            mice.Event += e => Input?.Invoke(e);
         }
 
         public void Dispose()
@@ -41,48 +29,40 @@ namespace Avalonia.LinuxFramebuffer
             throw new NotSupportedException();
         }
 
-
+        
         public void Invalidate(Rect rect)
         {
+            if(_renderQueued)
+                return;
+            _renderQueued = true;
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Paint?.Invoke(new Rect(default(Point), ClientSize));
+                _renderQueued = false;
+            });
         }
 
         public void SetInputRoot(IInputRoot inputRoot)
         {
             InputRoot = inputRoot;
-            _inputBackend.SetInputRoot(inputRoot);
         }
 
-        public Point PointToClient(PixelPoint p) => p.ToPoint(1);
+        public Point PointToClient(Point point) => point;
 
-        public PixelPoint PointToScreen(Point p) => PixelPoint.FromPoint(p, 1);
+        public Point PointToScreen(Point point) => point;
 
-        public void SetCursor(ICursorImpl cursor)
+        public void SetCursor(IPlatformHandle cursor)
         {
         }
 
-        public Size ClientSize => ScaledSize;
-        public Size? FrameSize => null;
-        public IMouseDevice MouseDevice => new MouseDevice();
-        public IPopupImpl CreatePopup() => null;
-
-        public double RenderScaling => _outputBackend.Scaling;
-        public IEnumerable<object> Surfaces { get; }
+        public Size ClientSize => _fb.PixelSize;
+        public double Scaling => 1;
+        public IEnumerable<object> Surfaces => new object[] {_fb};
         public Action<RawInputEventArgs> Input { get; set; }
         public Action<Rect> Paint { get; set; }
-        public Action<Size, PlatformResizeReason> Resized { get; set; }
+        public Action<Size> Resized { get; set; }
         public Action<double> ScalingChanged { get; set; }
-
-        public Action<WindowTransparencyLevel> TransparencyLevelChanged { get; set; }
-
         public Action Closed { get; set; }
-        public Action LostFocus { get; set; }
-
-        public Size ScaledSize => _outputBackend.PixelSize.ToSize(RenderScaling);
-
-        public void SetTransparencyLevelHint(WindowTransparencyLevel transparencyLevel) { }
-
-        public WindowTransparencyLevel TransparencyLevel { get; private set; }
-
-        public AcrylicPlatformCompensationLevels AcrylicCompensationLevels { get; } = new AcrylicPlatformCompensationLevels(1, 1, 1);
+        public event Action LostFocus;
     }
 }

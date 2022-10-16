@@ -1,10 +1,14 @@
-using System.Threading.Tasks;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Media;
 using Xunit;
 
-#if AVALONIA_SKIA
+#if AVALONIA_CAIRO
+namespace Avalonia.Cairo.RenderTests.Shapes
+#elif AVALONIA_SKIA
 namespace Avalonia.Skia.RenderTests
 #else
 namespace Avalonia.Direct2D1.RenderTests.Shapes
@@ -18,27 +22,7 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
         }
 
         [Fact]
-        public async Task Rectangle_0px_Stroke()
-        {
-            Decorator target = new Decorator
-            {
-                Padding = new Thickness(8),
-                Width = 200,
-                Height = 200,
-                Child = new Rectangle
-                {
-                    Fill = Brushes.Transparent,
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 0
-                }
-            };
-
-            await RenderToFile(target);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task Rectangle_1px_Stroke()
+        public void Rectangle_1px_Stroke()
         {
             Decorator target = new Decorator
             {
@@ -52,12 +36,12 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
         [Fact]
-        public async Task Rectangle_2px_Stroke()
+        public void Rectangle_2px_Stroke()
         {
             Decorator target = new Decorator
             {
@@ -71,12 +55,12 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
         [Fact]
-        public async Task Rectangle_Stroke_Fill()
+        public void Rectangle_Stroke_Fill()
         {
             Decorator target = new Decorator
             {
@@ -91,12 +75,12 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
         [Fact]
-        public async Task Rectangle_Stroke_Fill_ClipToBounds()
+        public void Rectangle_Stroke_Fill_ClipToBounds()
         {
             Decorator target = new Decorator
             {
@@ -112,7 +96,7 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
     }

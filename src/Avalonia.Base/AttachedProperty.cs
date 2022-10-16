@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 
 namespace Avalonia
@@ -6,7 +9,7 @@ namespace Avalonia
     /// An attached avalonia property.
     /// </summary>
     /// <typeparam name="TValue">The type of the property's value.</typeparam>
-    public class AttachedProperty<TValue> : StyledProperty<TValue>
+    public class AttachedProperty<TValue> : StyledPropertyBase<TValue>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="AttachedProperty{TValue}"/> class.
@@ -15,14 +18,12 @@ namespace Avalonia
         /// <param name="ownerType">The class that is registering the property.</param>
         /// <param name="metadata">The property metadata.</param>
         /// <param name="inherits">Whether the property inherits its value.</param>
-        /// <param name="validate">A value validation callback.</param>
         public AttachedProperty(
             string name,
-            Type ownerType,
+            Type ownerType,            
             StyledPropertyMetadata<TValue> metadata,
-            bool inherits = false,
-            Func<TValue, bool>? validate = null)
-            : base(name, ownerType, metadata, inherits, validate)
+            bool inherits = false)
+            : base(name, ownerType, metadata, inherits)
         {
         }
 
@@ -34,10 +35,11 @@ namespace Avalonia
         /// </summary>
         /// <typeparam name="TOwner">The owner type.</typeparam>
         /// <returns>The property.</returns>
-        public new AttachedProperty<TValue> AddOwner<TOwner>() where TOwner : IAvaloniaObject
+        public StyledProperty<TValue> AddOwner<TOwner>() where TOwner : IAvaloniaObject
         {
-            AvaloniaPropertyRegistry.Instance.Register(typeof(TOwner), this);
-            return this;
+            var result = new StyledProperty<TValue>(this, typeof(TOwner));
+            AvaloniaPropertyRegistry.Instance.Register(typeof(TOwner), result);
+            return result;
         }
     }
 }

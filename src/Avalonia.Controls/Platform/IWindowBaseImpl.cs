@@ -1,38 +1,40 @@
 using System;
-using Avalonia.Automation.Peers;
-using Avalonia.Metadata;
+using Avalonia.Controls;
 
 namespace Avalonia.Platform
 {
-    [Unstable]
     public interface IWindowBaseImpl : ITopLevelImpl
     {
         /// <summary>
-        /// Shows the window.
+        /// Shows the toplevel.
         /// </summary>
-        /// <param name="activate">Whether to activate the shown window.</param>
-        /// <param name="isDialog">Whether the window is being shown as a dialog.</param>
-        void Show(bool activate, bool isDialog);
+        void Show();
 
         /// <summary>
         /// Hides the window.
         /// </summary>
         void Hide();
-        
-        /// <summary>
-        /// Gets the scaling factor for Window positioning and sizing.
-        /// </summary>
-        double DesktopScaling { get; }
 
         /// <summary>
-        /// Gets the position of the window in device pixels.
+        /// Starts moving a window with left button being held. Should be called from left mouse button press event handler.
         /// </summary>
-        PixelPoint Position { get; }
+        void BeginMoveDrag();
+
+        /// <summary>
+        /// Starts resizing a window. This function is used if an application has window resizing controls. 
+        /// Should be called from left mouse button press event handler
+        /// </summary>
+        void BeginResizeDrag(WindowEdge edge);
+
+        /// <summary>
+        /// Gets position of the window relatively to the screen
+        /// </summary>
+        Point Position { get; set; }
         
         /// <summary>
         /// Gets or sets a method called when the window's position changes.
         /// </summary>
-        Action<PixelPoint>? PositionChanged { get; set; }
+        Action<Point> PositionChanged { get; set; }
 
         /// <summary>
         /// Activates the window.
@@ -42,31 +44,26 @@ namespace Avalonia.Platform
         /// <summary>
         /// Gets or sets a method called when the window is deactivated (loses focus).
         /// </summary>
-        Action? Deactivated { get; set; }
+        Action Deactivated { get; set; }
 
         /// <summary>
         /// Gets or sets a method called when the window is activated (receives focus).
         /// </summary>
-        Action? Activated { get; set; }
+        Action Activated { get; set; }
 
         /// <summary>
         /// Gets the platform window handle.
         /// </summary>
         IPlatformHandle Handle { get; }
-       
+        
         /// <summary>
-        /// Gets a maximum client size hint for an auto-sizing window, in device-independent pixels.
+        /// Gets the maximum size of a window on the system.
         /// </summary>
-        Size MaxAutoSizeHint { get; }
+        Size MaxClientSize { get; }
 
         /// <summary>
-        /// Sets whether this window appears on top of all other windows
+        /// Sets the client size of the toplevel.
         /// </summary>
-        void SetTopmost(bool value);
-
-        /// <summary>
-        /// Gets platform specific display information
-        /// </summary>
-        IScreenImpl Screen { get; }
+        void Resize(Size clientSize);
     }
 }

@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Animation;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
@@ -18,10 +21,10 @@ namespace Avalonia.Controls
             AvaloniaProperty.Register<Carousel, bool>(nameof(IsVirtualized), true);
 
         /// <summary>
-        /// Defines the <see cref="PageTransition"/> property.
+        /// Defines the <see cref="Transition"/> property.
         /// </summary>
-        public static readonly StyledProperty<IPageTransition?> PageTransitionProperty =
-            AvaloniaProperty.Register<Carousel, IPageTransition?>(nameof(PageTransition));
+        public static readonly StyledProperty<IPageTransition> TransitionProperty =
+            AvaloniaProperty.Register<Carousel, IPageTransition>("Transition");
 
         /// <summary>
         /// The default value of <see cref="ItemsControl.ItemsPanelProperty"/> for 
@@ -54,10 +57,10 @@ namespace Avalonia.Controls
         /// <summary>
         /// Gets or sets the transition to use when moving between pages.
         /// </summary>
-        public IPageTransition? PageTransition
+        public IPageTransition Transition
         {
-            get { return GetValue(PageTransitionProperty); }
-            set { SetValue(PageTransitionProperty, value); }
+            get { return GetValue(TransitionProperty); }
+            set { SetValue(TransitionProperty, value); }
         }
 
         /// <summary>
@@ -80,6 +83,18 @@ namespace Avalonia.Controls
             {
                 --SelectedIndex;
             }
+        }
+
+        /// <inheritdoc/>
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            // Ignore key presses.
+        }
+
+        /// <inheritdoc/>
+        protected override void OnPointerPressed(PointerPressedEventArgs e)
+        {
+            // Ignore pointer presses.
         }
     }
 }

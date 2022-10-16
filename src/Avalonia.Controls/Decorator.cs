@@ -1,4 +1,6 @@
-using Avalonia.Layout;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Metadata;
 
 namespace Avalonia.Controls
@@ -11,8 +13,8 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="Child"/> property.
         /// </summary>
-        public static readonly StyledProperty<IControl?> ChildProperty =
-            AvaloniaProperty.Register<Decorator, IControl?>(nameof(Child));
+        public static readonly StyledProperty<IControl> ChildProperty =
+            AvaloniaProperty.Register<Decorator, IControl>(nameof(Child));
 
         /// <summary>
         /// Defines the <see cref="Padding"/> property.
@@ -25,15 +27,15 @@ namespace Avalonia.Controls
         /// </summary>
         static Decorator()
         {
-            AffectsMeasure<Decorator>(ChildProperty, PaddingProperty);
-            ChildProperty.Changed.AddClassHandler<Decorator>((x, e) => x.ChildChanged(e));
+            AffectsMeasure(ChildProperty, PaddingProperty);
+            ChildProperty.Changed.AddClassHandler<Decorator>(x => x.ChildChanged);
         }
 
         /// <summary>
         /// Gets or sets the decorated control.
         /// </summary>
         [Content]
-        public IControl? Child
+        public IControl Child
         {
             get { return GetValue(ChildProperty); }
             set { SetValue(ChildProperty, value); }
@@ -51,13 +53,25 @@ namespace Avalonia.Controls
         /// <inheritdoc/>
         protected override Size MeasureOverride(Size availableSize)
         {
-            return LayoutHelper.MeasureChild(Child, availableSize, Padding);
+            var content = Child;
+            var padding = Padding;
+
+            if (content != null)
+            {
+                content.Measure(availableSize.Deflate(padding));
+                return content.DesiredSize.Inflate(padding);
+            }
+            else
+            {
+                return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
+            }
         }
 
         /// <inheritdoc/>
         protected override Size ArrangeOverride(Size finalSize)
         {
-            return LayoutHelper.ArrangeChild(Child, finalSize, Padding);
+            Child?.Arrange(new Rect(finalSize).Deflate(Padding));
+            return finalSize;
         }
 
         /// <summary>
@@ -66,8 +80,8 @@ namespace Avalonia.Controls
         /// <param name="e">The event args.</param>
         private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
         {
-            var oldChild = (Control?)e.OldValue;
-            var newChild = (Control?)e.NewValue;
+            var oldChild = (Control)e.OldValue;
+            var newChild = (Control)e.NewValue;
 
             if (oldChild != null)
             {

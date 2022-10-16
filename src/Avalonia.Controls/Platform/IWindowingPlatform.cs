@@ -1,14 +1,15 @@
-using Avalonia.Metadata;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Avalonia.Platform
 {
-    [Unstable]
     public interface IWindowingPlatform
     {
         IWindowImpl CreateWindow();
-
-        IWindowImpl CreateEmbeddableWindow();
-
-        ITrayIconImpl? CreateTrayIcon();
+        IEmbeddableWindowImpl CreateEmbeddableWindow();
+        IPopupImpl CreatePopup();
     }
 }

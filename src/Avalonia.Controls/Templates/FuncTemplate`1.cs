@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using Avalonia.Styling;
 
@@ -17,7 +20,9 @@ namespace Avalonia.Controls.Templates
         /// <param name="func">The function used to create the control.</param>
         public FuncTemplate(Func<TControl> func)
         {
-            _func = func ?? throw new ArgumentNullException(nameof(func));
+            Contract.Requires<ArgumentNullException>(func != null);
+
+            _func = func;
         }
 
         /// <summary>

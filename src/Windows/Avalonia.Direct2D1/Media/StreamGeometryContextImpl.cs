@@ -1,15 +1,16 @@
-using System;
-using Avalonia.Logging;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Media;
-using Avalonia.Metadata;
 using Avalonia.Platform;
 using SharpDX.Direct2D1;
-using D2D = SharpDX.Direct2D1;
 using SweepDirection = SharpDX.Direct2D1.SweepDirection;
+using D2D = SharpDX.Direct2D1;
+using Avalonia.Logging;
+using System;
 
 namespace Avalonia.Direct2D1.Media
 {
-    [Unstable]
     public class StreamGeometryContextImpl : IStreamGeometryContextImpl
     {
         private readonly GeometrySink _sink;
@@ -84,7 +85,8 @@ namespace Avalonia.Direct2D1.Media
             }
             catch (Exception ex)
             {
-                Logger.TryGet(LogEventLevel.Error, LogArea.Visual)?.Log(
+                Logger.Error(
+                    LogArea.Visual,
                     this,
                     "GeometrySink.Close exception: {Exception}",
                     ex);

@@ -1,14 +1,12 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Windows.Input;
-using Avalonia.Automation.Peers;
-using Avalonia.Controls.Metadata;
-using Avalonia.Controls.Primitives;
-using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
+using Avalonia.Rendering;
 using Avalonia.VisualTree;
 
 namespace Avalonia.Controls
@@ -30,14 +28,10 @@ namespace Avalonia.Controls
     }
 
     /// <summary>
-    /// A standard button control.
+    /// A button control.
     /// </summary>
-    [PseudoClasses(pcFlyoutOpen, pcPressed)]
-    public class Button : ContentControl, ICommandSource, IClickableControl
+    public class Button : ContentControl
     {
-        protected const string pcPressed    = ":pressed";
-        protected const string pcFlyoutOpen = ":flyout-open";
-
         /// <summary>
         /// Defines the <see cref="ClickMode"/> property.
         /// </summary>
@@ -47,56 +41,32 @@ namespace Avalonia.Controls
         /// <summary>
         /// Defines the <see cref="Command"/> property.
         /// </summary>
-        public static readonly DirectProperty<Button, ICommand?> CommandProperty =
-            AvaloniaProperty.RegisterDirect<Button, ICommand?>(nameof(Command),
-                button => button.Command, (button, command) => button.Command = command, enableDataValidation: true);
+        public static readonly StyledProperty<ICommand> CommandProperty =
+            AvaloniaProperty.Register<Button, ICommand>(nameof(Command));
 
         /// <summary>
         /// Defines the <see cref="HotKey"/> property.
         /// </summary>
-        public static readonly StyledProperty<KeyGesture?> HotKeyProperty =
+        public static readonly StyledProperty<KeyGesture> HotKeyProperty =
             HotKeyManager.HotKeyProperty.AddOwner<Button>();
 
         /// <summary>
         /// Defines the <see cref="CommandParameter"/> property.
         /// </summary>
-        public static readonly StyledProperty<object?> CommandParameterProperty =
-            AvaloniaProperty.Register<Button, object?>(nameof(CommandParameter));
+        public static readonly StyledProperty<object> CommandParameterProperty =
+            AvaloniaProperty.Register<Button, object>(nameof(CommandParameter));
 
         /// <summary>
-        /// Defines the <see cref="IsDefault"/> property.
+        /// Defines the <see cref="IsDefaultProperty"/> property.
         /// </summary>
         public static readonly StyledProperty<bool> IsDefaultProperty =
             AvaloniaProperty.Register<Button, bool>(nameof(IsDefault));
 
         /// <summary>
-        /// Defines the <see cref="IsCancel"/> property.
-        /// </summary>
-        public static readonly StyledProperty<bool> IsCancelProperty =
-            AvaloniaProperty.Register<Button, bool>(nameof(IsCancel));
-
-        /// <summary>
         /// Defines the <see cref="Click"/> event.
         /// </summary>
         public static readonly RoutedEvent<RoutedEventArgs> ClickEvent =
-            RoutedEvent.Register<Button, RoutedEventArgs>(nameof(Click), RoutingStrategies.Bubble);
-
-        /// <summary>
-        /// Defines the <see cref="IsPressed"/> property.
-        /// </summary>
-        public static readonly StyledProperty<bool> IsPressedProperty =
-            AvaloniaProperty.Register<Button, bool>(nameof(IsPressed));
-
-        /// <summary>
-        /// Defines the <see cref="Flyout"/> property
-        /// </summary>
-        public static readonly StyledProperty<FlyoutBase?> FlyoutProperty =
-            AvaloniaProperty.Register<Button, FlyoutBase?>(nameof(Flyout));
-
-        private ICommand? _command;
-        private bool _commandCanExecute = true;
-        private KeyGesture? _hotkey;
-        private bool _isFlyoutOpen = false;
+            RoutedEvent.Register<Button, RoutedEventArgs>("Click", RoutingStrategies.Bubble);
 
         /// <summary>
         /// Initializes static members of the <see cref="Button"/> class.
@@ -104,23 +74,18 @@ namespace Avalonia.Controls
         static Button()
         {
             FocusableProperty.OverrideDefaultValue(typeof(Button), true);
-            AccessKeyHandler.AccessKeyPressedEvent.AddClassHandler<Button>((lbl, args) => lbl.OnAccessKey(args));
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Button"/> class.
-        /// </summary>
-        public Button()
-        {
+            ClickEvent.AddClassHandler<Button>(x => x.OnClick);
+            CommandProperty.Changed.Subscribe(CommandChanged);
+            IsDefaultProperty.Changed.Subscribe(IsDefaultChanged);
         }
 
         /// <summary>
         /// Raised when the user clicks the button.
         /// </summary>
-        public event EventHandler<RoutedEventArgs>? Click
+        public event EventHandler<RoutedEventArgs> Click
         {
-            add => AddHandler(ClickEvent, value);
-            remove => RemoveHandler(ClickEvent, value);
+            add { AddHandler(ClickEvent, value); }
+            remove { RemoveHandler(ClickEvent, value); }
         }
 
         /// <summary>
@@ -128,35 +93,35 @@ namespace Avalonia.Controls
         /// </summary>
         public ClickMode ClickMode
         {
-            get => GetValue(ClickModeProperty);
-            set => SetValue(ClickModeProperty, value);
+            get { return GetValue(ClickModeProperty); }
+            set { SetValue(ClickModeProperty, value); }
         }
 
         /// <summary>
         /// Gets or sets an <see cref="ICommand"/> to be invoked when the button is clicked.
         /// </summary>
-        public ICommand? Command
+        public ICommand Command
         {
-            get => _command;
-            set => SetAndRaise(CommandProperty, ref _command, value);
+            get { return GetValue(CommandProperty); }
+            set { SetValue(CommandProperty, value); }
         }
 
         /// <summary>
         /// Gets or sets an <see cref="KeyGesture"/> associated with this control
         /// </summary>
-        public KeyGesture? HotKey
+        public KeyGesture HotKey
         {
-            get => GetValue(HotKeyProperty);
-            set => SetValue(HotKeyProperty, value);
+            get { return GetValue(HotKeyProperty); }
+            set { SetValue(HotKeyProperty, value); }
         }
 
         /// <summary>
         /// Gets or sets a parameter to be passed to the <see cref="Command"/>.
         /// </summary>
-        public object? CommandParameter
+        public object CommandParameter
         {
-            get => GetValue(CommandParameterProperty);
-            set => SetValue(CommandParameterProperty, value);
+            get { return GetValue(CommandParameterProperty); }
+            set { SetValue(CommandParameterProperty, value); }
         }
 
         /// <summary>
@@ -165,40 +130,9 @@ namespace Avalonia.Controls
         /// </summary>
         public bool IsDefault
         {
-            get => GetValue(IsDefaultProperty);
-            set => SetValue(IsDefaultProperty, value);
+            get { return GetValue(IsDefaultProperty); }
+            set { SetValue(IsDefaultProperty, value); }
         }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the button is the Cancel button for the
-        /// window.
-        /// </summary>
-        public bool IsCancel
-        {
-            get => GetValue(IsCancelProperty);
-            set => SetValue(IsCancelProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the button is currently pressed.
-        /// </summary>
-        public bool IsPressed
-        {
-            get => GetValue(IsPressedProperty);
-            private set => SetValue(IsPressedProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets the Flyout that should be shown with this button.
-        /// </summary>
-        public FlyoutBase? Flyout
-        {
-            get => GetValue(FlyoutProperty);
-            set => SetValue(FlyoutProperty, value);
-        }
-
-        /// <inheritdoc/>
-        protected override bool IsEnabledCore => base.IsEnabledCore && _commandCanExecute;
 
         /// <inheritdoc/>
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -207,104 +141,31 @@ namespace Avalonia.Controls
 
             if (IsDefault)
             {
-                if (e.Root is IInputElement inputElement)
+                var inputElement = e.Root as IInputElement;
+
+                if (inputElement != null)
                 {
                     ListenForDefault(inputElement);
                 }
             }
-            if (IsCancel)
-            {
-                if (e.Root is IInputElement inputElement)
-                {
-                    ListenForCancel(inputElement);
-                }
-            }
         }
-
-        /// <inheritdoc/>
-        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-        {
-            base.OnDetachedFromVisualTree(e);
-
-            if (IsDefault)
-            {
-                if (e.Root is IInputElement inputElement)
-                {
-                    StopListeningForDefault(inputElement);
-                }
-            }
-            if (IsCancel)
-            {
-                if (e.Root is IInputElement inputElement)
-                {
-                    StopListeningForCancel(inputElement);
-                }
-            }
-        }
-
-        /// <inheritdoc/>
-        protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
-        {
-            if (_hotkey != null) // Control attached again, set Hotkey to create a hotkey manager for this control
-            {
-                HotKey = _hotkey;
-            }
-
-            base.OnAttachedToLogicalTree(e);
-
-            if (Command != null)
-            {
-                Command.CanExecuteChanged += CanExecuteChanged;
-                CanExecuteChanged(this, EventArgs.Empty);
-            }
-        }
-
-        /// <inheritdoc/>
-        protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
-        {
-            // This will cause the hotkey manager to dispose the observer and the reference to this control
-            if (HotKey != null)
-            {
-                _hotkey = HotKey;
-                HotKey = null;
-            }
-
-            base.OnDetachedFromLogicalTree(e);
-
-            if (Command != null)
-            {
-                Command.CanExecuteChanged -= CanExecuteChanged;
-            }
-        }
-
-        protected virtual void OnAccessKey(RoutedEventArgs e) => OnClick();
 
         /// <inheritdoc/>
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            switch (e.Key)
+            if (e.Key == Key.Enter)
             {
-                case Key.Enter:
-                    OnClick();
-                    e.Handled = true;
-                    break;
-
-                case Key.Space:
+                RaiseClickEvent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Space)
+            {
+                if (ClickMode == ClickMode.Press)
                 {
-                    if (ClickMode == ClickMode.Press)
-                    {
-                        OnClick();
-                    }
-
-                    IsPressed = true;
-                    e.Handled = true;
-                    break;
+                    RaiseClickEvent();
                 }
 
-                case Key.Escape when Flyout != null:
-                    // If Flyout doesn't have focusable content, close the flyout here
-                    CloseFlyout();
-                    break;
+                e.Handled = true;
             }
 
             base.OnKeyDown(e);
@@ -317,72 +178,36 @@ namespace Avalonia.Controls
             {
                 if (ClickMode == ClickMode.Release)
                 {
-                    OnClick();
+                    RaiseClickEvent();
                 }
-                IsPressed = false;
+
                 e.Handled = true;
             }
+        }
 
-            base.OnKeyUp(e);
+        /// <inheritdoc/>
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
+
+            if (IsDefault)
+            {
+                var inputElement = e.Root as IInputElement;
+
+                if (inputElement != null)
+                {
+                    StopListeningForDefault(inputElement);
+                }
+            }
         }
 
         /// <summary>
         /// Invokes the <see cref="Click"/> event.
         /// </summary>
-        protected virtual void OnClick()
+        /// <param name="e">The event args.</param>
+        protected virtual void OnClick(RoutedEventArgs e)
         {
-            if (IsEffectivelyEnabled)
-            {
-                if (_isFlyoutOpen)
-                {
-                    CloseFlyout();
-                }
-                else
-                {
-                    OpenFlyout();
-                }
-
-                var e = new RoutedEventArgs(ClickEvent);
-                RaiseEvent(e);
-
-                if (!e.Handled && Command?.CanExecute(CommandParameter) == true)
-                {
-                    Command.Execute(CommandParameter);
-                    e.Handled = true;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Opens the button's flyout.
-        /// </summary>
-        protected virtual void OpenFlyout()
-        {
-            Flyout?.ShowAt(this);
-        }
-
-        /// <summary>
-        /// Closes the button's flyout.
-        /// </summary>
-        protected virtual void CloseFlyout()
-        {
-            Flyout?.Hide();
-        }
-
-        /// <summary>
-        /// Invoked when the button's flyout is opened.
-        /// </summary>
-        protected virtual void OnFlyoutOpened()
-        {
-            // Available for derived types
-        }
-
-        /// <summary>
-        /// Invoked when the button's flyout is closed.
-        /// </summary>
-        protected virtual void OnFlyoutClosed()
-        {
-            // Available for derived types
+            Command?.Execute(CommandParameter);
         }
 
         /// <inheritdoc/>
@@ -390,15 +215,13 @@ namespace Avalonia.Controls
         {
             base.OnPointerPressed(e);
 
-            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-            {
-                IsPressed = true;
-                e.Handled = true;
+            PseudoClasses.Add(":pressed");
+            e.Device.Capture(this);
+            e.Handled = true;
 
-                if (ClickMode == ClickMode.Press)
-                {
-                    OnClick();
-                }
+            if (ClickMode == ClickMode.Press)
+            {
+                RaiseClickEvent();
             }
         }
 
@@ -407,191 +230,76 @@ namespace Avalonia.Controls
         {
             base.OnPointerReleased(e);
 
-            if (IsPressed && e.InitialPressMouseButton == MouseButton.Left)
-            {
-                IsPressed = false;
-                e.Handled = true;
+            e.Device.Capture(null);
+            PseudoClasses.Remove(":pressed");
+            e.Handled = true;
 
-                if (ClickMode == ClickMode.Release &&
-                    this.GetVisualsAt(e.GetPosition(this)).Any(c => this == c || this.IsVisualAncestorOf(c)))
-                {
-                    OnClick();
-                }
+            if (ClickMode == ClickMode.Release && Classes.Contains(":pointerover"))
+            {
+                RaiseClickEvent();
             }
         }
 
-        /// <inheritdoc/>
-        protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+        /// <summary>
+        /// Called when the <see cref="Command"/> property changes.
+        /// </summary>
+        /// <param name="e">The event args.</param>
+        private static void CommandChanged(AvaloniaPropertyChangedEventArgs e)
         {
-            base.OnPointerCaptureLost(e);
+            var button = e.Sender as Button;
 
-            IsPressed = false;
+            if (button != null)
+            {
+                var oldCommand = e.OldValue as ICommand;
+                var newCommand = e.NewValue as ICommand;
+
+                if (oldCommand != null)
+                {
+                    oldCommand.CanExecuteChanged -= button.CanExecuteChanged;
+                }
+
+                if (newCommand != null)
+                {
+                    newCommand.CanExecuteChanged += button.CanExecuteChanged;
+                }
+
+                button.CanExecuteChanged(button, EventArgs.Empty);
+            }
         }
 
-        /// <inheritdoc/>
-        protected override void OnLostFocus(RoutedEventArgs e)
+        /// <summary>
+        /// Called when the <see cref="IsDefault"/> property changes.
+        /// </summary>
+        /// <param name="e">The event args.</param>
+        private static void IsDefaultChanged(AvaloniaPropertyChangedEventArgs e)
         {
-            base.OnLostFocus(e);
+            var button = e.Sender as Button;
+            var isDefault = (bool)e.NewValue;
+            var inputRoot = button?.VisualRoot as IInputElement;
 
-            IsPressed = false;
-        }
-
-        /// <inheritdoc/>
-        protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
-        {
-            base.OnApplyTemplate(e);
-
-            UnregisterFlyoutEvents(Flyout);
-            RegisterFlyoutEvents(Flyout);
-            UpdatePseudoClasses();
-        }
-
-        /// <inheritdoc/>
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            if (change.Property == CommandProperty)
+            if (inputRoot != null)
             {
-                if (((ILogical)this).IsAttachedToLogicalTree)
+                if (isDefault)
                 {
-                    var (oldValue, newValue) = change.GetOldAndNewValue<ICommand?>();
-                    if (oldValue is ICommand oldCommand)
-                    {
-                        oldCommand.CanExecuteChanged -= CanExecuteChanged;
-                    }
-
-                    if (newValue is ICommand newCommand)
-                    {
-                        newCommand.CanExecuteChanged += CanExecuteChanged;
-                    }
+                    button.ListenForDefault(inputRoot);
                 }
-
-                CanExecuteChanged(this, EventArgs.Empty);
-            }
-            else if (change.Property == CommandParameterProperty)
-            {
-                CanExecuteChanged(this, EventArgs.Empty);
-            }
-            else if (change.Property == IsCancelProperty)
-            {
-                var isCancel = change.GetNewValue<bool>();
-
-                if (VisualRoot is IInputElement inputRoot)
+                else
                 {
-                    if (isCancel)
-                    {
-                        ListenForCancel(inputRoot);
-                    }
-                    else
-                    {
-                        StopListeningForCancel(inputRoot);
-                    }
-                }
-            }
-            else if (change.Property == IsDefaultProperty)
-            {
-                var isDefault = change.GetNewValue<bool>();
-
-                if (VisualRoot is IInputElement inputRoot)
-                {
-                    if (isDefault)
-                    {
-                        ListenForDefault(inputRoot);
-                    }
-                    else
-                    {
-                        StopListeningForDefault(inputRoot);
-                    }
-                }
-            }
-            else if (change.Property == IsPressedProperty)
-            {
-                UpdatePseudoClasses();
-            }
-            else if (change.Property == FlyoutProperty)
-            {
-                var (oldFlyout, newFlyout) = change.GetOldAndNewValue<FlyoutBase?>();
-
-                // If flyout is changed while one is already open, make sure we 
-                // close the old one first
-                if (oldFlyout != null && oldFlyout.IsOpen)
-                {
-                    oldFlyout.Hide();
-                }
-
-                // Must unregister events here while a reference to the old flyout still exists
-                UnregisterFlyoutEvents(oldFlyout);
-
-                RegisterFlyoutEvents(newFlyout);
-                UpdatePseudoClasses();
-            }
-        }
-
-        protected override AutomationPeer OnCreateAutomationPeer() => new ButtonAutomationPeer(this);
-
-        /// <inheritdoc/>
-        protected override void UpdateDataValidation(
-            AvaloniaProperty property,
-            BindingValueType state,
-            Exception? error)
-        {
-            base.UpdateDataValidation(property, state, error);
-            if (property == CommandProperty)
-            {
-                if (state == BindingValueType.BindingError)
-                {
-                    if (_commandCanExecute)
-                    {
-                        _commandCanExecute = false;
-                        UpdateIsEffectivelyEnabled();
-                    }
+                    button.StopListeningForDefault(inputRoot);
                 }
             }
         }
-
-        internal void PerformClick() => OnClick();
 
         /// <summary>
         /// Called when the <see cref="ICommand.CanExecuteChanged"/> event fires.
         /// </summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="e">The event args.</param>
-        private void CanExecuteChanged(object? sender, EventArgs e)
+        private void CanExecuteChanged(object sender, EventArgs e)
         {
-            var canExecute = Command == null || Command.CanExecute(CommandParameter);
-
-            if (canExecute != _commandCanExecute)
-            {
-                _commandCanExecute = canExecute;
-                UpdateIsEffectivelyEnabled();
-            }
-        }
-
-        /// <summary>
-        /// Registers all flyout events.
-        /// </summary>
-        /// <param name="flyout">The flyout to connect events to.</param>
-        private void RegisterFlyoutEvents(FlyoutBase? flyout)
-        {
-            if (flyout != null)
-            {
-                flyout.Opened += Flyout_Opened;
-                flyout.Closed += Flyout_Closed;
-            }
-        }
-
-        /// <summary>
-        /// Explicitly unregisters all flyout events.
-        /// </summary>
-        /// <param name="flyout">The flyout to disconnect events from.</param>
-        private void UnregisterFlyoutEvents(FlyoutBase? flyout)
-        {
-            if (flyout != null)
-            {
-                flyout.Opened -= Flyout_Opened;
-                flyout.Closed -= Flyout_Closed;
-             }
+            // HACK: Just set the IsEnabled property for the moment. This needs to be changed to
+            // use IsEnabledCore etc. but it will do for now.
+            IsEnabled = Command == null || Command.CanExecute(CommandParameter);
         }
 
         /// <summary>
@@ -600,16 +308,7 @@ namespace Avalonia.Controls
         /// <param name="root">The input root.</param>
         private void ListenForDefault(IInputElement root)
         {
-            root.AddHandler(KeyDownEvent, RootDefaultKeyDown);
-        }
-
-        /// <summary>
-        /// Starts listening for the Escape key when the button <see cref="IsCancel"/>.
-        /// </summary>
-        /// <param name="root">The input root.</param>
-        private void ListenForCancel(IInputElement root)
-        {
-            root.AddHandler(KeyDownEvent, RootCancelKeyDown);
+            root.AddHandler(KeyDownEvent, RootKeyDown);
         }
 
         /// <summary>
@@ -618,16 +317,20 @@ namespace Avalonia.Controls
         /// <param name="root">The input root.</param>
         private void StopListeningForDefault(IInputElement root)
         {
-            root.RemoveHandler(KeyDownEvent, RootDefaultKeyDown);
+            root.RemoveHandler(KeyDownEvent, RootKeyDown);
         }
 
         /// <summary>
-        /// Stops listening for the Escape key when the button is no longer <see cref="IsCancel"/>.
+        /// Raises the <see cref="Click"/> event.
         /// </summary>
-        /// <param name="root">The input root.</param>
-        private void StopListeningForCancel(IInputElement root)
+        private void RaiseClickEvent()
         {
-            root.RemoveHandler(KeyDownEvent, RootCancelKeyDown);
+            RoutedEventArgs click = new RoutedEventArgs
+            {
+                RoutedEvent = ClickEvent,
+            };
+
+            RaiseEvent(click);
         }
 
         /// <summary>
@@ -635,78 +338,11 @@ namespace Avalonia.Controls
         /// </summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="e">The event args.</param>
-        private void RootDefaultKeyDown(object? sender, KeyEventArgs e)
+        private void RootKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter && IsVisible && IsEnabled)
             {
-                OnClick();
-                e.Handled = true;
-            }
-        }
-
-        /// <summary>
-        /// Called when a key is pressed on the input root and the button <see cref="IsCancel"/>.
-        /// </summary>
-        /// <param name="sender">The event sender.</param>
-        /// <param name="e">The event args.</param>
-        private void RootCancelKeyDown(object? sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Escape && IsVisible && IsEnabled)
-            {
-                OnClick();
-                e.Handled = true;
-            }
-        }
-
-        /// <summary>
-        /// Updates the visual state of the control by applying latest PseudoClasses.
-        /// </summary>
-        private void UpdatePseudoClasses()
-        {
-            PseudoClasses.Set(pcFlyoutOpen, _isFlyoutOpen);
-            PseudoClasses.Set(pcPressed, IsPressed);
-        }
-
-        void ICommandSource.CanExecuteChanged(object sender, EventArgs e) => this.CanExecuteChanged(sender, e);
-
-        void IClickableControl.RaiseClick() => OnClick();
-        
-        /// <summary>
-        /// Event handler for when the button's flyout is opened.
-        /// </summary>
-        private void Flyout_Opened(object? sender, EventArgs e)
-        {
-            var flyout = sender as FlyoutBase;
-
-            // It is possible to share flyouts among multiple controls including Button.
-            // This can cause a problem here since all controls that share a flyout receive
-            // the same Opened/Closed events at the same time.
-            // For Button that means they all would be updating their pseudoclasses accordingly.
-            // In other words, all Buttons with a shared Flyout would have the backgrounds changed together.
-            // To fix this, only continue here if the Flyout target matches this Button instance.
-            if (object.ReferenceEquals(flyout?.Target, this))
-            {
-                _isFlyoutOpen = true;
-                UpdatePseudoClasses();
-
-                OnFlyoutOpened();
-            }
-        }
-
-        /// <summary>
-        /// Event handler for when the button's flyout is closed.
-        /// </summary>
-        private void Flyout_Closed(object? sender, EventArgs e)
-        {
-            var flyout = sender as FlyoutBase;
-
-            // See comments in Flyout_Opened
-            if (object.ReferenceEquals(flyout?.Target, this))
-            {
-                _isFlyoutOpen = false;
-                UpdatePseudoClasses();
-
-                OnFlyoutClosed();
+                RaiseClickEvent();
             }
         }
     }

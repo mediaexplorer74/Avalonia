@@ -5,7 +5,7 @@ using Avalonia.Platform;
 
 namespace Avalonia.UnitTests
 {
-    public class MockStreamGeometryImpl : IStreamGeometryImpl, ITransformedGeometryImpl
+    public class MockStreamGeometryImpl : IStreamGeometryImpl
     {
         private MockStreamGeometryContext _context;
 
@@ -27,11 +27,7 @@ namespace Avalonia.UnitTests
             _context = context;
         }
 
-        public IGeometryImpl SourceGeometry { get; }
-
         public Rect Bounds => _context.CalculateBounds();
-        
-        public double ContourLength { get; }
 
         public Matrix Transform { get; }
 
@@ -40,21 +36,17 @@ namespace Avalonia.UnitTests
             return this;
         }
 
-        public void Dispose()
-        {
-        }
-
         public bool FillContains(Point point)
         {
             return _context.FillContains(point);
         }
 
-        public bool StrokeContains(IPen pen, Point point)
+        public bool StrokeContains(Pen pen, Point point)
         {
             return false;
         }
 
-        public Rect GetRenderBounds(IPen pen) => Bounds;
+        public Rect GetRenderBounds(double strokeThickness) => Bounds;
 
         public IGeometryImpl Intersect(IGeometryImpl geometry)
         {
@@ -66,28 +58,9 @@ namespace Avalonia.UnitTests
             return _context;
         }
 
-        public ITransformedGeometryImpl WithTransform(Matrix transform)
+        public IGeometryImpl WithTransform(Matrix transform)
         {
             return new MockStreamGeometryImpl(transform, _context);
-        }
-
-        public bool TryGetPointAtDistance(double distance, out Point point)
-        {
-            point = new Point();
-            return false;
-        }
-
-        public bool TryGetPointAndTangentAtDistance(double distance, out Point point, out Point tangent)
-        {
-            point = new Point();
-            tangent = new Point();
-            return false;
-        }
-
-        public bool TryGetSegment(double startDistance, double stopDistance, bool startOnBeginFigure, out IGeometryImpl segmentGeometry)
-        {
-            segmentGeometry = null;
-            return false;
         }
 
         class MockStreamGeometryContext : IStreamGeometryContextImpl
@@ -148,7 +121,7 @@ namespace Avalonia.UnitTests
 
             public bool FillContains(Point point)
             {
-                // Use the algorithm from https://www.blackpawn.com/texts/pointinpoly/default.html
+                // Use the algorithm from http://www.blackpawn.com/texts/pointinpoly/default.html
                 // to determine if the point is in the geometry (since it will always be convex in this situation)
                 for (int i = 0; i < points.Count; i++)
                 {

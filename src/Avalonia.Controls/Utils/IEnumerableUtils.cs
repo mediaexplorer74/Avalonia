@@ -1,6 +1,9 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections;
-using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace Avalonia.Controls.Utils
@@ -12,35 +15,20 @@ namespace Avalonia.Controls.Utils
             return items.IndexOf(item) != -1;
         }
 
-        public static bool TryGetCountFast(this IEnumerable? items, out int count)
+        public static int Count(this IEnumerable items)
         {
             if (items != null)
             {
-                if (items is ICollection collection)
-                {
-                    count = collection.Count;
-                    return true;
-                }
-                else if (items is IReadOnlyCollection<object> readOnly)
-                {
-                    count = readOnly.Count;
-                    return true;
-                }
-            }
+                var collection = items as ICollection;
 
-            count = 0;
-            return false;
-        }
-
-        public static int Count(this IEnumerable? items)
-        {
-            if (TryGetCountFast(items, out var count))
-            {
-                return count;
-            }
-            else if (items != null)
-            {
-                return Enumerable.Count(items.Cast<object>());
+                if (collection != null)
+                {
+                    return collection.Count;
+                }
+                else
+                {
+                    return Enumerable.Count(items.Cast<object>());
+                }
             }
             else
             {
@@ -50,7 +38,7 @@ namespace Avalonia.Controls.Utils
 
         public static int IndexOf(this IEnumerable items, object item)
         {
-            _ = items ?? throw new ArgumentNullException(nameof(items));
+            Contract.Requires<ArgumentNullException>(items != null);
 
             var list = items as IList;
 
@@ -76,9 +64,9 @@ namespace Avalonia.Controls.Utils
             }
         }
 
-        public static object? ElementAt(this IEnumerable items, int index)
+        public static object ElementAt(this IEnumerable items, int index)
         {
-            _ = items ?? throw new ArgumentNullException(nameof(items));
+            Contract.Requires<ArgumentNullException>(items != null);
 
             var list = items as IList;
 

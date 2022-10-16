@@ -1,11 +1,13 @@
-using System.Reactive.Subjects;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls;
 using Avalonia.UnitTests;
 using Xunit;
 
 namespace Avalonia.Markup.Xaml.UnitTests.Xaml
 {
-    public class BindingTests : XamlTestBase
+    public class BindingTests
     {
         [Fact]
         public void Binding_To_DataContext_Works()
@@ -18,7 +20,8 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
     <Button Name='button' Content='{Binding Foo}'/>
 </Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
                 var button = window.FindControl<Button>("button");
 
                 button.DataContext = new { Foo = "foo" };
@@ -43,7 +46,8 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         </Button.Content>
     </Button>
 </Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
                 var button = window.FindControl<Button>("button");
 
                 button.DataContext = new { Foo = "foo" };
@@ -68,7 +72,8 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         </Button.Tag>
     </Button>
 </Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
                 var button = window.FindControl<Button>("button");
 
                 Assert.Same(button, ((NonControl)button.Tag).Control);
@@ -78,7 +83,7 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         [Fact]
         public void Can_Bind_To_DataContext_Of_Anchor_On_Non_Control()
         {
-            using (UnitTestApplication.Start(TestServices.MockWindowingPlatform))
+            using (UnitTestApplication.Start(TestServices.StyledWindow))
             {
                 var xaml = @"
 <Window xmlns='https://github.com/avaloniaui'
@@ -90,7 +95,8 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         </Button.Tag>
     </Button>
 </Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
                 var button = window.FindControl<Button>("button");
 
                 button.DataContext = new { Foo = "foo" };
@@ -109,7 +115,8 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
         Title='{Binding Foo}'>
 </Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
 
                 window.DataContext = new { Foo = "foo" };
                 window.ApplyTemplate();
@@ -128,33 +135,32 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
     <Border DataContext='{Binding Foo}'/>
 </Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
                 var border = (Border)window.Content;
 
                 window.DataContext = new { Foo = "foo" };
                 window.ApplyTemplate();
-                window.Presenter.ApplyTemplate();
 
                 Assert.Equal("foo", border.DataContext);
             }
         }
 
-
-        [Fact]
+        [Fact(Skip = "OmniXaml doesn't support nested markup extensions. #119")]
         public void Binding_To_Self_Works()
         {
-            using (UnitTestApplication.Start(TestServices.MockWindowingPlatform))
+            using (UnitTestApplication.Start(TestServices.StyledWindow))
             {
                 var xaml = @"
 <Window xmlns='https://github.com/avaloniaui'
         xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
     <TextBlock Name='textblock' Text='{Binding Tag, RelativeSource={RelativeSource Self}}'/>
 </Window>";
-
-                var window = AvaloniaRuntimeXamlLoader.Parse<ContentControl>(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
                 var textBlock = (TextBlock)window.Content;
 
-                textBlock.Tag = "foo";
+                window.ApplyTemplate();
 
                 Assert.Equal("foo", textBlock.Text);
             }
@@ -163,7 +169,7 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         [Fact]
         public void Longform_Binding_To_Self_Works()
         {
-            using (UnitTestApplication.Start(TestServices.MockWindowingPlatform))
+            using (UnitTestApplication.Start(TestServices.StyledWindow))
             {
                 var xaml = @"
 <Window xmlns='https://github.com/avaloniaui'
@@ -174,270 +180,13 @@ namespace Avalonia.Markup.Xaml.UnitTests.Xaml
         </TextBlock.Text>
     </TextBlock>
 </Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
+                var loader = new AvaloniaXamlLoader();
+                var window = (Window)loader.Load(xaml);
                 var textBlock = (TextBlock)window.Content;
 
                 window.ApplyTemplate();
 
                 Assert.Equal("foo", textBlock.Text);
-            }
-        }
-
-        [Fact]
-        public void Binding_To_Self_In_Style_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
-       
-    <Window.Styles>
-        <Style Selector='Button'>
-            <Setter Property='IsVisible' Value='{Binding $self.IsEnabled}' />
-        </Style>
-    </Window.Styles>
-
-    <Button Name='button' />
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var button = window.FindControl<Button>("button");
-
-                window.ApplyTemplate();
-                window.Presenter.ApplyTemplate();
-
-                Assert.True(button.IsVisible);
-
-                button.IsEnabled = false;
-
-                Assert.False(button.IsVisible);
-            }
-        }
-
-        [Fact]
-        public void Stream_Binding_To_Observable_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.MockWindowingPlatform))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
-    <TextBlock Name='textblock' Text='{Binding Observable^}'/>
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var textBlock = (TextBlock)window.Content;
-                var observable = new BehaviorSubject<string>("foo");
-
-                window.DataContext = new { Observable = observable };
-                window.ApplyTemplate();
-
-                Assert.Equal("foo", textBlock.Text);
-                observable.OnNext("bar");
-                Assert.Equal("bar", textBlock.Text);
-            }
-        }
-
-        [Fact]
-        public void Binding_To_Namespaced_Attached_Property_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.MockWindowingPlatform))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <TextBlock local:AttachedPropertyOwner.Double='{Binding}'/>
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var textBlock = (TextBlock)window.Content;
-
-                window.DataContext = 5.6;
-                window.ApplyTemplate();
-
-                Assert.Equal(5.6, AttachedPropertyOwner.GetDouble(textBlock));
-            }
-        }
-
-        [Fact]
-        public void Binding_To_AddOwnered_Attached_Property_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.MockWindowingPlatform))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <local:TestControl Double='{Binding}'/>
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var testControl = (TestControl)window.Content;
-
-                window.DataContext = 5.6;
-                window.ApplyTemplate();
-
-                Assert.Equal(5.6, testControl.Double);
-            }
-        }
-
-        [Fact]
-        public void Binding_To_Attached_Property_Using_AddOwnered_Type_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.MockWindowingPlatform))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <TextBlock local:TestControl.Double='{Binding}'/>
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var textBlock = (TextBlock)window.Content;
-
-                window.DataContext = 5.6;
-                window.ApplyTemplate();
-
-                Assert.Equal(5.6, AttachedPropertyOwner.GetDouble(textBlock));
-            }
-        }
-
-        [Fact]
-        public void Binding_To_Attached_Property_In_Style_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <Window.Styles>
-        <Style Selector='TextBlock'>
-            <Setter Property='local:TestControl.Double' Value='{Binding}'/>
-        </Style>
-    </Window.Styles>
-    <TextBlock/>
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var textBlock = (TextBlock)window.Content;
-
-                window.DataContext = 5.6;
-                window.ApplyTemplate();
-
-                Assert.Equal(5.6, AttachedPropertyOwner.GetDouble(textBlock));
-            }
-        }
-
-        [Theory,
-            InlineData(@"Hello \{0\}"),
-            InlineData(@"'Hello {0}'"),
-            InlineData(@"Hello {0}")]
-        
-        public void Binding_To_TextBlock_Text_With_StringConverter_Works(string fmt)
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <TextBlock Name='textBlock' Text=""{Binding Foo, StringFormat=" + fmt + @"}""/> 
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml); 
-                var textBlock = window.FindControl<TextBlock>("textBlock"); 
-
-                textBlock.DataContext = new { Foo = "world" };
-                window.ApplyTemplate(); 
-
-                Assert.Equal("Hello world", textBlock.Text); 
-            }
-        }
-
-        [Theory,
-            InlineData("{}{0} {1}!"),
-            InlineData(@"\{0\} \{1\}!")]
-        public void MultiBinding_To_TextBlock_Text_With_StringConverter_Works(string fmt)
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <TextBlock Name='textBlock'>
-        <TextBlock.Text>
-            <MultiBinding StringFormat='" + fmt + @"'>
-                <Binding Path='Greeting1'/>
-                <Binding Path='Greeting2'/>
-            </MultiBinding>
-        </TextBlock.Text>
-    </TextBlock> 
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var textBlock = window.FindControl<TextBlock>("textBlock");
-
-                textBlock.DataContext = new WindowViewModel();
-                window.ApplyTemplate();
-
-                Assert.Equal("Hello World!", textBlock.Text);
-            }
-        }
-
-        [Fact]
-        public void Binding_OneWayToSource_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        ShowInTaskbar='{Binding ShowInTaskbar, Mode=OneWayToSource}'>
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var viewModel = new WindowViewModel();
-
-                window.DataContext = viewModel;
-                window.ApplyTemplate();
-
-                Assert.True(window.ShowInTaskbar);
-                Assert.True(viewModel.ShowInTaskbar);
-            }
-        }
-
-        private class WindowViewModel
-        {
-            public bool ShowInTaskbar { get; set; }
-            public string Greeting1 { get; set; } = "Hello";
-            public string Greeting2 { get; set; } = "World";
-        }
-        
-        [Fact]
-        public void Binding_Classes_Works()
-        {
-            using (UnitTestApplication.Start(TestServices.StyledWindow))
-            {
-                // Note, this test also checks `Classes` reordering, so it should be kept AFTER the last single class
-                var xaml = @"
-<Window xmlns='https://github.com/avaloniaui'
-        xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-        xmlns:local='clr-namespace:Avalonia.Markup.Xaml.UnitTests.Xaml;assembly=Avalonia.Markup.Xaml.UnitTests'>
-    <Button Name='button' Classes.MyClass='{Binding Foo}' Classes.MySecondClass='True' Classes='foo bar'/>
-</Window>";
-                var window = (Window)AvaloniaRuntimeXamlLoader.Load(xaml);
-                var button = window.FindControl<Button>("button");
-
-                button.DataContext = new { Foo = true };
-                window.ApplyTemplate();
-
-                Assert.True(button.Classes.Contains("MyClass"));
-                Assert.True(button.Classes.Contains("MySecondClass"));
-                Assert.True(button.Classes.Contains("foo"));
-                Assert.True(button.Classes.Contains("bar"));
-
-                button.DataContext = new { Foo = false };
-                
-                Assert.False(button.Classes.Contains("MyClass"));
-                Assert.True(button.Classes.Contains("MySecondClass"));
-                Assert.True(button.Classes.Contains("foo"));
-                Assert.True(button.Classes.Contains("bar"));
             }
         }
     }

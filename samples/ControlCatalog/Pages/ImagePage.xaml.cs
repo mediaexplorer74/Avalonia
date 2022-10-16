@@ -1,78 +1,41 @@
-using System;
+using System.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform;
 
 namespace ControlCatalog.Pages
 {
     public class ImagePage : UserControl
     {
-        private readonly Image _bitmapImage;
-        private readonly Image _drawingImage;
-        private readonly Image _croppedImage;
-
+        private Image iconImage;
         public ImagePage()
         {
-            InitializeComponent();
-            _bitmapImage = this.Get<Image>("bitmapImage");
-            _drawingImage = this.Get<Image>("drawingImage");
-            _croppedImage = this.Get<Image>("croppedImage");
+            this.InitializeComponent();
         }
 
         private void InitializeComponent()
         {
             AvaloniaXamlLoader.Load(this);
+            iconImage = this.Get<Image>("Icon");
         }
 
-        public void BitmapStretchChanged(object sender, SelectionChangedEventArgs e)
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
         {
-            if (_bitmapImage != null)
+            base.OnAttachedToVisualTree(e);
+            if (iconImage.Source == null)
             {
-                var comboxBox = (ComboBox)sender;
-                _bitmapImage.Stretch = (Stretch)comboxBox.SelectedIndex;
-            }
-        }
-
-        public void DrawingStretchChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_drawingImage != null)
-            {
-                var comboxBox = (ComboBox)sender;
-                _drawingImage.Stretch = (Stretch)comboxBox.SelectedIndex;
-            }
-        }
-
-        public void BitmapCropChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_croppedImage != null)
-            {
-                var comboxBox = (ComboBox)sender;
-                if (_croppedImage.Source is CroppedBitmap croppedBitmap)
+                var windowRoot = e.Root as Window;
+                if (windowRoot != null)
                 {
-                    croppedBitmap.SourceRect = GetCropRect(comboxBox.SelectedIndex);
+                    using (var stream = new MemoryStream())
+                    {
+                        windowRoot.Icon.Save(stream);
+                        stream.Seek(0, SeekOrigin.Begin);
+                        iconImage.Source = new Bitmap(stream);
+                    }
                 }
-                
             }
-        }
-
-        private PixelRect GetCropRect(int index)
-        {
-            var bitmapWidth = 640;
-            var bitmapHeight = 426;
-            var cropSize = new PixelSize(320, 240);
-            return index switch
-            {
-                1 => new PixelRect(new PixelPoint((bitmapWidth - cropSize.Width) / 2, (bitmapHeight - cropSize.Width) / 2), cropSize),
-                2 => new PixelRect(new PixelPoint(0, 0), cropSize),
-                3 => new PixelRect(new PixelPoint(bitmapWidth - cropSize.Width, 0), cropSize),
-                4 => new PixelRect(new PixelPoint(0, bitmapHeight - cropSize.Height), cropSize),
-                5 => new PixelRect(new PixelPoint(bitmapWidth - cropSize.Width, bitmapHeight - cropSize.Height), cropSize),
-                _ => PixelRect.Empty
-            };
-            
         }
     }
 }

@@ -1,8 +1,13 @@
-﻿using System;
+﻿// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System;
 using System.Collections.Specialized;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.VisualTree;
 
 namespace Avalonia.Controls
 {
@@ -27,7 +32,7 @@ namespace Avalonia.Controls
             }
         }
 
-        IVirtualizingController? IVirtualizingPanel.Controller { get; set; }
+        IVirtualizingController IVirtualizingPanel.Controller { get; set; }
         int IVirtualizingPanel.OverflowCount => _canBeRemoved;
         Orientation IVirtualizingPanel.ScrollDirection => Orientation;
         double IVirtualizingPanel.AverageItemSize => _averageItemSize;
@@ -36,7 +41,7 @@ namespace Avalonia.Controls
         {
             get
             {
-                var bounds = Orientation == Orientation.Horizontal ?
+                var bounds = Orientation == Orientation.Horizontal ? 
                     _availableSpace.Width : _availableSpace.Height;
                 return Math.Max(0, _takenSpace - bounds);
             }
@@ -70,7 +75,7 @@ namespace Avalonia.Controls
             }
         }
 
-        private IVirtualizingController? Controller => ((IVirtualizingPanel)this).Controller;
+        private IVirtualizingController Controller => ((IVirtualizingPanel)this).Controller;
 
         void IVirtualizingPanel.ForceInvalidateMeasure()
         {
@@ -103,14 +108,14 @@ namespace Avalonia.Controls
             return result;
         }
 
-        protected override void ChildrenChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        protected override void ChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             base.ChildrenChanged(sender, e);
 
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
-                    foreach (IControl control in e.NewItems!)
+                    foreach (IControl control in e.NewItems)
                     {
                         UpdateAdd(control);
                     }
@@ -118,7 +123,7 @@ namespace Avalonia.Controls
                     break;
 
                 case NotifyCollectionChangedAction.Remove:
-                    foreach (IControl control in e.OldItems!)
+                    foreach (IControl control in e.OldItems)
                     {
                         UpdateRemove(control);
                     }
@@ -127,13 +132,14 @@ namespace Avalonia.Controls
             }
         }
 
-        protected override IInputElement? GetControlInDirection(NavigationDirection direction, IControl? from)
+        protected override IInputElement GetControlInDirection(NavigationDirection direction, IControl from)
         {
             var logicalScrollable = Parent as ILogicalScrollable;
+            var fromControl = from as IControl;
 
-            if (logicalScrollable?.IsLogicalScrollEnabled == true)
+            if (logicalScrollable?.IsLogicalScrollEnabled == true && fromControl != null)
             {
-                return logicalScrollable.GetControlInDirection(direction, from);
+                return logicalScrollable.GetControlInDirection(direction, fromControl);
             }
             else
             {
@@ -142,7 +148,7 @@ namespace Avalonia.Controls
         }
 
         internal override void ArrangeChild(
-            IControl child,
+            IControl child, 
             Rect rect,
             Size panelSize,
             Orientation orientation)
@@ -194,7 +200,7 @@ namespace Avalonia.Controls
         private void UpdateAdd(IControl child)
         {
             var bounds = Bounds;
-            var spacing = Spacing;
+            var gap = Gap;
 
             child.Measure(_availableSpace);
             ++_averageCount;
@@ -202,13 +208,13 @@ namespace Avalonia.Controls
             if (Orientation == Orientation.Vertical)
             {
                 var height = child.DesiredSize.Height;
-                _takenSpace += height + spacing;
+                _takenSpace += height + gap;
                 AddToAverageItemSize(height);
             }
             else
             {
                 var width = child.DesiredSize.Width;
-                _takenSpace += width + spacing;
+                _takenSpace += width + gap;
                 AddToAverageItemSize(width);
             }
         }
@@ -216,18 +222,18 @@ namespace Avalonia.Controls
         private void UpdateRemove(IControl child)
         {
             var bounds = Bounds;
-            var spacing = Spacing;
+            var gap = Gap;
 
             if (Orientation == Orientation.Vertical)
             {
                 var height = child.DesiredSize.Height;
-                _takenSpace -= height + spacing;
+                _takenSpace -= height + gap;
                 RemoveFromAverageItemSize(height);
             }
             else
             {
                 var width = child.DesiredSize.Width;
-                _takenSpace -= width + spacing;
+                _takenSpace -= width + gap;
                 RemoveFromAverageItemSize(width);
             }
 

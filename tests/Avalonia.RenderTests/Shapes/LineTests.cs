@@ -1,10 +1,14 @@
-using System.Threading.Tasks;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Media;
 using Xunit;
 
-#if AVALONIA_SKIA
+#if AVALONIA_CAIRO
+namespace Avalonia.Cairo.RenderTests.Shapes
+#elif AVALONIA_SKIA
 namespace Avalonia.Skia.RenderTests
 #else
 namespace Avalonia.Direct2D1.RenderTests.Shapes
@@ -16,9 +20,9 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
             : base(@"Shapes\Line")
         {
         }
-        
+
         [Fact]
-        public async Task Line_1px_Stroke()
+        public void Line_1px_Stroke()
         {
             Decorator target = new Decorator
             {
@@ -33,12 +37,12 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
-        
+
         [Fact]
-        public async Task Line_1px_Stroke_Reversed()
+        public void Line_1px_Stroke_Reversed()
         {
             Decorator target = new Decorator
             {
@@ -53,12 +57,12 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
         [Fact]
-        public async Task Line_1px_Stroke_Vertical()
+        public void Line_1px_Stroke_Vertical()
         {
             Decorator target = new Decorator
             {
@@ -73,7 +77,7 @@ namespace Avalonia.Direct2D1.RenderTests.Shapes
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
     }

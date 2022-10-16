@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.LogicalTree;
@@ -216,7 +219,7 @@ namespace Avalonia.Controls.UnitTests
                 scrollable.Setup(x => x.IsLogicalScrollEnabled).Returns(true);
 
                 ((ISetLogicalParent)target).SetParent(presenter.Object);
-                ((INavigableContainer)target).GetControl(NavigationDirection.Next, from, false);
+                ((INavigableContainer)target).GetControl(NavigationDirection.Next, from);
 
                 scrollable.Verify(x => x.GetControlInDirection(NavigationDirection.Next, from));
             }

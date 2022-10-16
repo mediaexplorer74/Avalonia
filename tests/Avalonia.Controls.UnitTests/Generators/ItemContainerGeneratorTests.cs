@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
@@ -63,7 +66,7 @@ namespace Avalonia.Controls.UnitTests.Generators
             target.Dematerialize(1, 1);
 
             Assert.Equal(containers[0].ContainerControl, target.ContainerFromIndex(0));
-            Assert.Null(target.ContainerFromIndex(1));
+            Assert.Equal(null, target.ContainerFromIndex(1));
             Assert.Equal(containers[2].ContainerControl, target.ContainerFromIndex(2));
         }
 
@@ -115,7 +118,7 @@ namespace Avalonia.Controls.UnitTests.Generators
         {
             var owner = new Decorator();
             var target = new ItemContainerGenerator(owner);
-            var container = (ContentPresenter)target.Materialize(0, "foo").ContainerControl;
+            var container = (ContentPresenter)target.Materialize(0, "foo", null).ContainerControl;
 
             Assert.Equal("foo", container.Content);
 
@@ -132,7 +135,7 @@ namespace Avalonia.Controls.UnitTests.Generators
         {
             var owner = new Decorator();
             var target = new ItemContainerGenerator<ListBoxItem>(owner, ListBoxItem.ContentProperty, null);
-            var container = (ListBoxItem)target.Materialize(0, "foo").ContainerControl;
+            var container = (ListBoxItem)target.Materialize(0, "foo", null).ContainerControl;
 
             Assert.Equal("foo", container.Content);
 
@@ -144,16 +147,6 @@ namespace Avalonia.Controls.UnitTests.Generators
             Assert.Equal("bar", container.Content);
         }
 
-        [Fact]
-        public void Materialize_Should_Create_Containers_When_Item_Is_Null()
-        {
-            var owner = new Decorator();
-            var target = new ItemContainerGenerator<ListBoxItem>(owner, ListBoxItem.ContentProperty, null);
-            var container = (ListBoxItem)target.Materialize(0, null).ContainerControl;
-
-            Assert.True(container != null, "The containers is not materialized.");
-        }
-
         private IList<ItemContainerInfo> Materialize(
             IItemContainerGenerator generator,
             int index,
@@ -163,7 +156,7 @@ namespace Avalonia.Controls.UnitTests.Generators
 
             foreach (var item in items)
             {
-                var container = generator.Materialize(index++, item);
+                var container = generator.Materialize(index++, item, null);
                 result.Add(container);
             }
 

@@ -1,34 +1,47 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+using Avalonia.Controls;
 using Avalonia.Platform;
+using Avalonia.Rendering;
+
+namespace Avalonia
+{
+    public static class SkiaApplicationExtensions
+    {
+        public static T UseSkia<T>(this T builder) where T : AppBuilderBase<T>, new()
+        {
+            builder.UseRenderingSubsystem(Skia.SkiaPlatform.Initialize, "Skia");
+            return builder;
+        }
+    }
+}
 
 namespace Avalonia.Skia
 {
-    /// <summary>
-    /// Skia platform initializer.
-    /// </summary>
     public static class SkiaPlatform
     {
-        /// <summary>
-        /// Initialize Skia platform.
-        /// </summary>
+        private static bool s_forceSoftwareRendering;
+
         public static void Initialize()
         {
-            Initialize(new SkiaOptions());
-        }
-
-        public static void Initialize(SkiaOptions options)
-        {
-            var customGpu = options.CustomGpuFactory?.Invoke();
-            var renderInterface = new PlatformRenderInterface(customGpu, options.MaxGpuResourceSizeBytes);
-
+            var renderInterface = new PlatformRenderInterface();
             AvaloniaLocator.CurrentMutable
-                .Bind<IPlatformRenderInterface>().ToConstant(renderInterface)
-                .Bind<IFontManagerImpl>().ToConstant(new FontManagerImpl())
-                .Bind<ITextShaperImpl>().ToConstant(new TextShaperImpl());
+                .Bind<IPlatformRenderInterface>().ToConstant(renderInterface);
         }
 
-        /// <summary>
-        /// Default DPI.
-        /// </summary>
-        public static Vector DefaultDpi => new Vector(96.0f, 96.0f);
+        public static bool ForceSoftwareRendering
+        {
+            get { return s_forceSoftwareRendering; }
+            set
+            {
+                s_forceSoftwareRendering = value;
+
+                // TODO: I left this property here as place holder. Do we still need the ability to Force software rendering? 
+                // Is it even possible with SkiaSharp? Perhaps kekekes can answer as part of the HW accel work. 
+                // 
+                throw new NotImplementedException();
+            }
+        }
     }
 }

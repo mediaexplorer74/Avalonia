@@ -1,4 +1,8 @@
-﻿using Avalonia.Controls.ApplicationLifetimes;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
 
 namespace Avalonia.DesignerSupport.TestApp
@@ -8,13 +12,6 @@ namespace Avalonia.DesignerSupport.TestApp
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
-        }
-
-        public override void OnFrameworkInitializationCompleted()
-        {
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                desktop.MainWindow = new MainWindow();
-            base.OnFrameworkInitializationCompleted();
         }
     }
 }

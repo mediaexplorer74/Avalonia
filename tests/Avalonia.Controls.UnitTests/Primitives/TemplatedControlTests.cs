@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +13,6 @@ using Avalonia.Styling;
 using Avalonia.UnitTests;
 using Avalonia.VisualTree;
 using Xunit;
-using Avalonia.Media;
 
 namespace Avalonia.Controls.UnitTests.Primitives
 {
@@ -21,7 +23,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             bool executed = false;
 
-            var template = new FuncControlTemplate((_, __) =>
+            var template = new FuncControlTemplate(_ =>
             {
                 executed = true;
                 return new Control();
@@ -40,7 +42,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             bool executed = false;
 
-            var template = new FuncControlTemplate((_, __) =>
+            var template = new FuncControlTemplate(_ =>
             {
                 executed = true;
                 return new Control();
@@ -61,11 +63,11 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             var target = new TemplatedControl
             {
-                Template = new FuncControlTemplate((_, __) => new Decorator
+                Template = new FuncControlTemplate(_ => new Decorator
                 {
                     Child = new Panel
                     {
-                        Children =
+                        Children = new Controls
                         {
                             new TextBlock(),
                             new Border(),
@@ -76,7 +78,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
 
             target.ApplyTemplate();
 
-            var types = target.GetVisualDescendants().Select(x => x.GetType()).ToList();
+            var types = target.GetVisualDescendents().Select(x => x.GetType()).ToList();
 
             Assert.Equal(
                 new[]
@@ -91,15 +93,15 @@ namespace Avalonia.Controls.UnitTests.Primitives
         }
 
         [Fact]
-        public void Templated_Children_Should_Have_TemplatedParent_Set()
+        public void Templated_Child_Should_Be_NameScope()
         {
             var target = new TemplatedControl
             {
-                Template = new FuncControlTemplate((_, __) => new Decorator
+                Template = new FuncControlTemplate(_ => new Decorator
                 {
                     Child = new Panel
                     {
-                        Children =
+                        Children = new Controls
                         {
                             new TextBlock(),
                             new Border(),
@@ -110,7 +112,30 @@ namespace Avalonia.Controls.UnitTests.Primitives
 
             target.ApplyTemplate();
 
-            var templatedParents = target.GetVisualDescendants()
+            Assert.NotNull(NameScope.GetNameScope((Control)target.GetVisualChildren().Single()));
+        }
+
+        [Fact]
+        public void Templated_Children_Should_Have_TemplatedParent_Set()
+        {
+            var target = new TemplatedControl
+            {
+                Template = new FuncControlTemplate(_ => new Decorator
+                {
+                    Child = new Panel
+                    {
+                        Children = new Controls
+                        {
+                            new TextBlock(),
+                            new Border(),
+                        }
+                    }
+                }),
+            };
+
+            target.ApplyTemplate();
+
+            var templatedParents = target.GetVisualDescendents()
                 .OfType<IControl>()
                 .Select(x => x.TemplatedParent)
                 .ToList();
@@ -124,7 +149,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             var target = new TemplatedControl
             {
-                Template = new FuncControlTemplate((_, __) => new Decorator())
+                Template = new FuncControlTemplate(_ => new Decorator())
             };
 
             target.ApplyTemplate();
@@ -136,29 +161,11 @@ namespace Avalonia.Controls.UnitTests.Primitives
         }
 
         [Fact]
-        public void Changing_Template_Should_Clear_Old_Templated_Childs_Parent()
-        {
-            var target = new TemplatedControl
-            {
-                Template = new FuncControlTemplate((_, __) => new Decorator())
-            };
-
-            target.ApplyTemplate();
-
-            var child = (Decorator)target.GetVisualChildren().Single();
-
-            target.Template = new FuncControlTemplate((_, __) => new Canvas());
-            target.ApplyTemplate();
-
-            Assert.Null(child.Parent);
-        }
-
-        [Fact]
         public void Nested_Templated_Control_Should_Not_Have_Template_Applied()
         {
             var target = new TemplatedControl
             {
-                Template = new FuncControlTemplate((_, __) => new ScrollViewer())
+                Template = new FuncControlTemplate(_ => new ScrollViewer())
             };
 
             target.ApplyTemplate();
@@ -178,11 +185,11 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 {
                     Child = target = new TestTemplatedControl
                     {
-                        Template = new FuncControlTemplate((_, __) =>
+                        Template = new FuncControlTemplate(_ =>
                         {
                             return new StackPanel
                             {
-                                Children =
+                                Children = new Controls
                                 {
                                     new TextBlock
                                     {
@@ -207,11 +214,11 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             var target = new TestTemplatedControl
             {
-                Template = new FuncControlTemplate((_, __) =>
+                Template = new FuncControlTemplate(_ =>
                 {
                     return new ContentControl
                     {
-                        Template = new FuncControlTemplate((parent, ___) =>
+                        Template = new FuncControlTemplate(parent =>
                         {
                             return new Border
                             {
@@ -247,11 +254,46 @@ namespace Avalonia.Controls.UnitTests.Primitives
         }
 
         [Fact]
+        public void Nested_TemplatedControls_Should_Register_With_Correct_NameScope()
+        {
+            var target = new ContentControl
+            {
+                Template = new FuncControlTemplate<ContentControl>(ScrollingContentControlTemplate),
+                Content = "foo"
+            };
+
+            var root = new TestRoot { Child = target };
+            target.ApplyTemplate();
+
+            var border = target.GetVisualChildren().FirstOrDefault();
+            Assert.IsType<Border>(border);
+
+            var scrollViewer = border.GetVisualChildren().FirstOrDefault();
+            Assert.IsType<ScrollViewer>(scrollViewer);
+            ((ScrollViewer)scrollViewer).ApplyTemplate();
+
+            var scrollContentPresenter = scrollViewer.GetVisualChildren().FirstOrDefault();
+            Assert.IsType<ScrollContentPresenter>(scrollContentPresenter);
+            ((ContentPresenter)scrollContentPresenter).UpdateChild();
+
+            var contentPresenter = scrollContentPresenter.GetVisualChildren().FirstOrDefault();
+            Assert.IsType<ContentPresenter>(contentPresenter);
+
+            var borderNs = NameScope.GetNameScope((Control)border);
+            var scrollContentPresenterNs = NameScope.GetNameScope((Control)scrollContentPresenter);
+
+            Assert.NotNull(borderNs);
+            Assert.Same(scrollViewer, borderNs.Find("ScrollViewer"));
+            Assert.Same(contentPresenter, borderNs.Find("PART_ContentPresenter"));
+            Assert.Same(scrollContentPresenter, scrollContentPresenterNs.Find("PART_ContentPresenter"));
+        }
+
+        [Fact]
         public void ApplyTemplate_Should_Raise_TemplateApplied()
         {
             var target = new TestTemplatedControl
             {
-                Template = new FuncControlTemplate((_, __) => new Decorator())
+                Template = new FuncControlTemplate(_ => new Decorator())
             };
 
             var raised = false;
@@ -274,7 +316,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
         {
             var target = new TestTemplatedControl
             {
-                Template = new FuncControlTemplate((_, __) => new Decorator
+                Template = new FuncControlTemplate(_ => new Decorator
                 {
                     Child = new Border(),
                 })
@@ -288,7 +330,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             Assert.Equal(target, decorator.TemplatedParent);
             Assert.Equal(target, border.TemplatedParent);
 
-            target.Template = new FuncControlTemplate((_, __) => new Canvas());
+            target.Template = new FuncControlTemplate(_ => new Canvas());
 
             // Templated children should not be removed here: the control may be re-added
             // somewhere with the same template, so they could still be of use.
@@ -310,7 +352,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             {
                 Child = new TestTemplatedControl
                 {
-                    Template = new FuncControlTemplate((_, __) => new Decorator
+                    Template = new FuncControlTemplate(_ => new Decorator
                     {
                         Child = templateChild,
                     })
@@ -332,7 +374,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             {
                 Child = new TestTemplatedControl
                 {
-                    Template = new FuncControlTemplate((_, __) => new Decorator
+                    Template = new FuncControlTemplate(_ => new Decorator
                     {
                         Child = templateChild,
                     })
@@ -357,15 +399,15 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 TestTemplatedControl target;
                 var root = new TestRoot
                 {
-                    Styles =
+                    Styles = new Styles
                     {
                         new Style(x => x.OfType<TestTemplatedControl>())
                         {
-                            Setters =
+                            Setters = new[]
                             {
                                 new Setter(
                                     TemplatedControl.TemplateProperty,
-                                    new FuncControlTemplate((_, __) => new Decorator
+                                    new FuncControlTemplate(_ => new Decorator
                                     {
                                         Child = new Border(),
                                     }))
@@ -393,15 +435,15 @@ namespace Avalonia.Controls.UnitTests.Primitives
                 TestTemplatedControl target;
                 var root = new TestRoot
                 {
-                    Styles =
+                    Styles = new Styles
                     {
                         new Style(x => x.OfType<TestTemplatedControl>())
                         {
-                            Setters =
+                            Setters = new[]
                             {
                                 new Setter(
                                     TemplatedControl.TemplateProperty,
-                                    new FuncControlTemplate((_, __) => new Decorator
+                                    new FuncControlTemplate(_ => new Decorator
                                     {
                                         Child = new Border(),
                                     }))
@@ -432,15 +474,15 @@ namespace Avalonia.Controls.UnitTests.Primitives
 
                 var root = new TestRoot
                 {
-                    Styles =
+                    Styles = new Styles
                     {
                         new Style(x => x.OfType<TestTemplatedControl>())
                         {
-                            Setters =
+                            Setters = new[]
                             {
                                 new Setter(
                                     TemplatedControl.TemplateProperty,
-                                    new FuncControlTemplate((_, __) => new Decorator
+                                    new FuncControlTemplate(_ => new Decorator
                                     {
                                         Child = new Border(),
                                     }))
@@ -452,15 +494,15 @@ namespace Avalonia.Controls.UnitTests.Primitives
 
                 var root2 = new TestRoot
                 {
-                    Styles =
+                    Styles = new Styles
                     {
                         new Style(x => x.OfType<TestTemplatedControl>())
                         {
-                            Setters =
+                            Setters = new[]
                             {
                                 new Setter(
                                     TemplatedControl.TemplateProperty,
-                                    new FuncControlTemplate((_, __) => new Decorator
+                                    new FuncControlTemplate(_ => new Decorator
                                     {
                                         Child = new Border(),
                                     }))
@@ -485,99 +527,7 @@ namespace Avalonia.Controls.UnitTests.Primitives
             }
         }
 
-        [Fact]
-        public void Moving_To_New_LogicalTree_Should_Detach_Attach_Template_Child()
-        {
-            using (UnitTestApplication.Start(TestServices.RealStyler))
-            {
-                TestTemplatedControl target;
-                var root = new TestRoot
-                {
-                    Child = target = new TestTemplatedControl
-                    {
-                        Template = new FuncControlTemplate((_, __) => new Decorator()),
-                    }
-                };
-
-                Assert.NotNull(target.Template);
-                target.ApplyTemplate();
-
-                var templateChild = (ILogical)target.GetVisualChildren().Single();
-                Assert.True(templateChild.IsAttachedToLogicalTree);
-
-                root.Child = null;
-                Assert.False(templateChild.IsAttachedToLogicalTree);
-
-                var newRoot = new TestRoot { Child = target };
-                Assert.True(templateChild.IsAttachedToLogicalTree);
-            }
-        }
-
-        [Fact]
-        public void Templated_Child_Should_Find_Resource_In_TemplatedParent()
-        {
-            var target = new ContentControl
-            {
-                Resources =
-                {
-                    { "red", Brushes.Red },
-                },
-                Template = new FuncControlTemplate<ContentControl>((x, scope) =>
-                {
-                    var result = new ContentPresenter
-                    {
-                        Name = "PART_ContentPresenter",
-                        [!ContentPresenter.ContentProperty] = x[!ContentControl.ContentProperty],
-                    }.RegisterInNameScope(scope);
-
-                    result.Bind(ContentPresenter.BackgroundProperty, result.GetResourceObservable("red"));
-
-                    return result;
-                }),
-            };
-
-            var root = new TestRoot(target);
-            target.ApplyTemplate();
-
-            var contentPresenter = Assert.IsType<ContentPresenter>(target.GetVisualChildren().Single());
-            Assert.Same(Brushes.Red, contentPresenter.Background);
-        }
-
-        [Fact]
-        public void Changing_Resource_In_Templated_Parent_Should_Affect_Templated_Child()
-        {
-            var target = new ContentControl
-            {
-                Resources =
-                {
-                    { "red", Brushes.Red },
-                },
-                Template = new FuncControlTemplate<ContentControl>((x, scope) =>
-                {
-                    var result = new ContentPresenter
-                    {
-                        Name = "PART_ContentPresenter",
-                        [!ContentPresenter.ContentProperty] = x[!ContentControl.ContentProperty],
-                    }.RegisterInNameScope(scope);
-
-                    result.Bind(ContentPresenter.BackgroundProperty, result.GetResourceObservable("red"));
-
-                    return result;
-                }),
-            };
-
-            var root = new TestRoot(target);
-            target.ApplyTemplate();
-
-            var contentPresenter = Assert.IsType<ContentPresenter>(target.GetVisualChildren().Single());
-            Assert.Same(Brushes.Red, contentPresenter.Background);
-
-            target.Resources["red"] = Brushes.Green;
-
-            Assert.Same(Brushes.Green, contentPresenter.Background);
-        }
-
-        private static IControl ScrollingContentControlTemplate(ContentControl control, INameScope scope)
+        private static IControl ScrollingContentControlTemplate(ContentControl control)
         {
             return new Border
             {
@@ -589,18 +539,18 @@ namespace Avalonia.Controls.UnitTests.Primitives
                     {
                         Name = "PART_ContentPresenter",
                         [!ContentPresenter.ContentProperty] = control[!ContentControl.ContentProperty],
-                    }.RegisterInNameScope(scope)
-                }.RegisterInNameScope(scope)
+                    }
+                }
             };
         }
 
-        private static Control ScrollViewerTemplate(ScrollViewer control, INameScope scope)
+        private static Control ScrollViewerTemplate(ScrollViewer control)
         {
             var result = new ScrollContentPresenter
             {
                 Name = "PART_ContentPresenter",
                 [~ContentPresenter.ContentProperty] = control[~ContentControl.ContentProperty],
-            }.RegisterInNameScope(scope);
+            };
 
             return result;
         }

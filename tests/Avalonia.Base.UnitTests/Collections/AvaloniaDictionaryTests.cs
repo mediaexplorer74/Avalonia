@@ -1,8 +1,9 @@
-using System;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using Avalonia.Collections;
-using Avalonia.Data.Core;
 using Xunit;
 
 namespace Avalonia.Base.UnitTests.Collections
@@ -106,16 +107,6 @@ namespace Avalonia.Base.UnitTests.Collections
         }
 
         [Fact]
-        public void Remove_Method_Should_Remove_Item_From_Collection()
-        {
-            var target = new AvaloniaDictionary<string, string>() { { "foo", "bar" } };
-            Assert.Equal(target.Count, 1);
-
-            target.Remove("foo");
-            Assert.Equal(target.Count, 0);
-        }
-
-        [Fact]
         public void Removing_Item_Should_Raise_PropertyChanged()
         {
             var target = new AvaloniaDictionary<string, string>();
@@ -154,7 +145,7 @@ namespace Avalonia.Base.UnitTests.Collections
             var tracker = new PropertyChangedTracker(target);
             target.Clear();
 
-            Assert.Equal(new[] { "Count", CommonPropertyNames.IndexerName }, tracker.Names);
+            Assert.Equal(new[] { "Count", "Item[]" }, tracker.Names);
         }
     }
 }

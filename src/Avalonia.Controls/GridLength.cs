@@ -1,17 +1,17 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Avalonia.Utilities;
+using System.Linq;
 
 namespace Avalonia.Controls
 {
     /// <summary>
     /// Defines the valid units for a <see cref="GridLength"/>.
     /// </summary>
-#if !BUILDTASK
-    public
-#endif
-    enum GridUnitType
+    public enum GridUnitType
     {
         /// <summary>
         /// The row or column is auto-sized to fit its content.
@@ -32,10 +32,7 @@ namespace Avalonia.Controls
     /// <summary>
     /// Holds the width or height of a <see cref="Grid"/>'s column and row definitions.
     /// </summary>
-#if !BUILDTASK
-    public
-#endif
-    struct GridLength : IEquatable<GridLength>
+    public struct GridLength : IEquatable<GridLength>
     {
         private readonly GridUnitType _type;
 
@@ -59,12 +56,12 @@ namespace Avalonia.Controls
         {
             if (value < 0 || double.IsNaN(value) || double.IsInfinity(value))
             {
-                throw new ArgumentException("Invalid value", nameof(value));
+                throw new ArgumentException("Invalid value", "value");
             }
 
             if (type < GridUnitType.Auto || type > GridUnitType.Star)
             {
-                throw new ArgumentException("Invalid value", nameof(type));
+                throw new ArgumentException("Invalid value", "type");
             }
 
             _type = type;
@@ -76,12 +73,6 @@ namespace Avalonia.Controls
         /// auto-size to fit its content.
         /// </summary>
         public static GridLength Auto => new GridLength(0, GridUnitType.Auto);
-
-        /// <summary>
-        /// Gets an instance of <see cref="GridLength"/> that indicates that a row or column should
-        /// fill its content.
-        /// </summary>
-        public static GridLength Star => new GridLength(1, GridUnitType.Star);
 
         /// <summary>
         /// Gets the unit of the <see cref="GridLength"/>.
@@ -135,7 +126,7 @@ namespace Avalonia.Controls
         /// </summary>
         /// <param name="o">The object with which to test equality.</param>
         /// <returns>True if the objects are equal, otherwise false.</returns>
-        public override bool Equals(object? o)
+        public override bool Equals(object o)
         {
             if (o == null)
             {
@@ -180,7 +171,7 @@ namespace Avalonia.Controls
                 return "Auto";
             }
 
-            string s = _value.ToString(CultureInfo.InvariantCulture);
+            string s = _value.ToString();
             return IsStar ? s + "*" : s;
         }
 
@@ -188,8 +179,9 @@ namespace Avalonia.Controls
         /// Parses a string to return a <see cref="GridLength"/>.
         /// </summary>
         /// <param name="s">The string.</param>
+        /// <param name="culture">The current culture.</param>
         /// <returns>The <see cref="GridLength"/>.</returns>
-        public static GridLength Parse(string s)
+        public static GridLength Parse(string s, CultureInfo culture)
         {
             s = s.ToUpperInvariant();
 
@@ -200,12 +192,12 @@ namespace Avalonia.Controls
             else if (s.EndsWith("*"))
             {
                 var valueString = s.Substring(0, s.Length - 1).Trim();
-                var value = valueString.Length > 0 ? double.Parse(valueString, CultureInfo.InvariantCulture) : 1;
+                var value = valueString.Length > 0 ? double.Parse(valueString, culture) : 1;
                 return new GridLength(value, GridUnitType.Star);
             }
             else
             {
-                var value = double.Parse(s, CultureInfo.InvariantCulture);
+                var value = double.Parse(s, culture);
                 return new GridLength(value, GridUnitType.Pixel);
             }
         }
@@ -214,16 +206,11 @@ namespace Avalonia.Controls
         /// Parses a string to return a collection of <see cref="GridLength"/>s.
         /// </summary>
         /// <param name="s">The string.</param>
+        /// <param name="culture">The current culture.</param>
         /// <returns>The <see cref="GridLength"/>.</returns>
-        public static IEnumerable<GridLength> ParseLengths(string s)
+        public static IEnumerable<GridLength> ParseLengths(string s, CultureInfo culture)
         {
-            using (var tokenizer = new StringTokenizer(s, CultureInfo.InvariantCulture))
-            {
-                while (tokenizer.TryReadString(out var item))
-                {
-                    yield return Parse(item);
-                }
-            }
+            return s.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => Parse(x, culture));
         }
     }
 }

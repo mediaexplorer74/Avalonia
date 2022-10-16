@@ -10,7 +10,7 @@ namespace Avalonia.Android.Platform.SkiaPlatform
     {
         private IntPtr _window;
 
-        public AndroidFramebuffer(Surface surface, double scaling)
+        public AndroidFramebuffer(Surface surface)
         {
             if(surface == null)
                 throw new ArgumentNullException(nameof(surface));
@@ -20,10 +20,9 @@ namespace Avalonia.Android.Platform.SkiaPlatform
             ANativeWindow_Buffer buffer;
             var rc = new ARect()
             {
-                right = ANativeWindow_getWidth(_window),
-                bottom = ANativeWindow_getHeight(_window)
+                right = Width = ANativeWindow_getWidth(_window),
+                bottom = Height = ANativeWindow_getHeight(_window)
             };
-            Size = new PixelSize(rc.right, rc.bottom);
             ANativeWindow_lock(_window, out buffer, ref rc);
 
             Format = buffer.format == AndroidPixelFormat.WINDOW_FORMAT_RGB_565
@@ -31,8 +30,6 @@ namespace Avalonia.Android.Platform.SkiaPlatform
 
             RowBytes = buffer.stride * (Format == PixelFormat.Rgb565 ? 2 : 4);
             Address = buffer.bits;
-
-            Dpi = new Vector(96, 96) * scaling;
         }
 
         public void Dispose()
@@ -44,9 +41,10 @@ namespace Avalonia.Android.Platform.SkiaPlatform
         }
 
         public IntPtr Address { get; set; }
-        public PixelSize Size { get; }
+        public int Width { get; }
+        public int Height { get; }
         public int RowBytes { get; }
-        public Vector Dpi { get; }
+        public Size Dpi { get; } = new Size(96, 96);
         public PixelFormat Format { get; }
 
         [DllImport("android")]

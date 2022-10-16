@@ -1,4 +1,9 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
+using System.Linq.Expressions;
+using System.Reflection;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
 
@@ -19,10 +24,13 @@ namespace Avalonia.Controls.Generators
         public ItemContainerGenerator(
             IControl owner, 
             AvaloniaProperty contentProperty,
-            AvaloniaProperty? contentTemplateProperty)
+            AvaloniaProperty contentTemplateProperty)
             : base(owner)
         {
-            ContentProperty = contentProperty ?? throw new ArgumentNullException(nameof(contentProperty));
+            Contract.Requires<ArgumentNullException>(owner != null);
+            Contract.Requires<ArgumentNullException>(contentProperty != null);
+
+            ContentProperty = contentProperty;
             ContentTemplateProperty = contentTemplateProperty;
         }
 
@@ -37,40 +45,47 @@ namespace Avalonia.Controls.Generators
         /// <summary>
         /// Gets the container's ContentTemplate property.
         /// </summary>
-        protected AvaloniaProperty? ContentTemplateProperty { get; }
+        protected AvaloniaProperty ContentTemplateProperty { get; }
 
         /// <inheritdoc/>
-        protected override IControl? CreateContainer(object item)
+        protected override IControl CreateContainer(object item)
         {
             var container = item as T;
 
-            if (container is null)
+            if (item == null)
             {
-                container = new T();
+                return null;
+            }
+            else if (container != null)
+            {
+                return container;
+            }
+            else
+            {
+                var result = new T();
 
                 if (ContentTemplateProperty != null)
                 {
-                    container.SetValue(ContentTemplateProperty, ItemTemplate, BindingPriority.Style);
+                    result.SetValue(ContentTemplateProperty, ItemTemplate, BindingPriority.Style);
                 }
 
-                container.SetValue(ContentProperty, item, BindingPriority.Style);
+                result.SetValue(ContentProperty, item, BindingPriority.Style);
 
                 if (!(item is IControl))
                 {
-                    container.DataContext = item;
+                    result.DataContext = item;
                 }
-            }
 
-            if (ItemContainerTheme != null)
-            {
-                container.SetValue(StyledElement.ThemeProperty, ItemContainerTheme, BindingPriority.Style);
+                return result;
             }
-
-            return container;
         }
 
         /// <inheritdoc/>
-        public override bool TryRecycle(int oldIndex, int newIndex, object item)
+        public override bool TryRecycle(
+            int oldIndex,
+            int newIndex,
+            object item,
+            IMemberSelector selector)
         {
             var container = ContainerFromIndex(oldIndex);
 
@@ -79,14 +94,16 @@ namespace Avalonia.Controls.Generators
                 throw new IndexOutOfRangeException("Could not recycle container: not materialized.");
             }
 
-            container.SetValue(ContentProperty, item);
+            var i = selector != null ? selector.Select(item) : item;
+
+            container.SetValue(ContentProperty, i);
 
             if (!(item is IControl))
             {
-                container.DataContext = item;
+                container.DataContext = i;
             }
 
-            var info = MoveContainer(oldIndex, newIndex, item);
+            var info = MoveContainer(oldIndex, newIndex, i);
             RaiseRecycled(new ItemContainerEventArgs(info));
 
             return true;

@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -8,8 +11,6 @@ using Avalonia.Rendering;
 using Avalonia.Threading;
 using System.Reactive.Disposables;
 using System.Reactive.Concurrency;
-using Avalonia.Input.Platform;
-using Avalonia.Animation;
 
 namespace Avalonia.UnitTests
 {
@@ -17,21 +18,10 @@ namespace Avalonia.UnitTests
     {
         private readonly TestServices _services;
 
-        public UnitTestApplication() : this(null)
-        {
-
-        }
-
         public UnitTestApplication(TestServices services)
         {
             _services = services ?? new TestServices();
-            AvaloniaLocator.CurrentMutable.BindToSelf<Application>(this);
             RegisterServices();
-        }
-
-        static UnitTestApplication()
-        {
-            AssetLoader.RegisterResUriParsers();
         }
 
         public static new UnitTestApplication Current => (UnitTestApplication)Application.Current;
@@ -42,6 +32,7 @@ namespace Avalonia.UnitTests
         {
             var scope = AvaloniaLocator.EnterScope();
             var app = new UnitTestApplication(services);
+            AvaloniaLocator.CurrentMutable.BindToSelf<Application>(app);
             Dispatcher.UIThread.UpdateServices();
             return Disposable.Create(() =>
             {
@@ -55,31 +46,40 @@ namespace Avalonia.UnitTests
             AvaloniaLocator.CurrentMutable
                 .Bind<IAssetLoader>().ToConstant(Services.AssetLoader)
                 .Bind<IFocusManager>().ToConstant(Services.FocusManager)
-                .Bind<IGlobalClock>().ToConstant(Services.GlobalClock)
                 .BindToSelf<IGlobalStyles>(this)
                 .Bind<IInputManager>().ToConstant(Services.InputManager)
                 .Bind<IKeyboardDevice>().ToConstant(Services.KeyboardDevice?.Invoke())
-                .Bind<IKeyboardNavigationHandler>().ToConstant(Services.KeyboardNavigation)
-                .Bind<IMouseDevice>().ToConstant(Services.MouseDevice?.Invoke())
+                .Bind<ILayoutManager>().ToConstant(Services.LayoutManager)
                 .Bind<IRuntimePlatform>().ToConstant(Services.Platform)
+                .Bind<IRendererFactory>().ToConstant(new RendererFactory(Services.Renderer))
                 .Bind<IPlatformRenderInterface>().ToConstant(Services.RenderInterface)
-                .Bind<IFontManagerImpl>().ToConstant(Services.FontManagerImpl)
-                .Bind<ITextShaperImpl>().ToConstant(Services.TextShaperImpl)
+                .Bind<IRenderLoop>().ToConstant(Services.RenderLoop)
                 .Bind<IPlatformThreadingInterface>().ToConstant(Services.ThreadingInterface)
                 .Bind<IScheduler>().ToConstant(Services.Scheduler)
-                .Bind<ICursorFactory>().ToConstant(Services.StandardCursorFactory)
+                .Bind<IStandardCursorFactory>().ToConstant(Services.StandardCursorFactory)
                 .Bind<IStyler>().ToConstant(Services.Styler)
                 .Bind<IWindowingPlatform>().ToConstant(Services.WindowingPlatform)
-                .Bind<PlatformHotkeyConfiguration>().ToSingleton<PlatformHotkeyConfiguration>();
-            var theme = Services.Theme?.Invoke();
+                .Bind<IApplicationLifecycle>().ToConstant(this);
+            var styles = Services.Theme?.Invoke();
 
-            if (theme is Styles styles)
+            if (styles != null)
             {
                 Styles.AddRange(styles);
             }
-            else if (theme is not null)
+        }
+
+        private class RendererFactory : IRendererFactory
+        {
+            Func<IRenderRoot, IRenderLoop, IRenderer> _func;
+
+            public RendererFactory(Func<IRenderRoot, IRenderLoop, IRenderer> func)
             {
-                Styles.Add(theme);
+                _func = func;
+            }
+
+            public IRenderer CreateRenderer(IRenderRoot root, IRenderLoop renderLoop)
+            {
+                return _func?.Invoke(root, renderLoop);
             }
         }
     }

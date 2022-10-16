@@ -1,15 +1,19 @@
 using System;
-using Avalonia.Controls;
-using Avalonia.Android;
+using System.IO;
+using System.Linq;
+using Android.Content;
+using Android.Views;
 using Avalonia.Android.Platform;
 using Avalonia.Android.Platform.Input;
+using Avalonia.Android.Platform.SkiaPlatform;
+using Avalonia.Controls;
+using Avalonia.Controls.Platform;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
-using Avalonia.OpenGL.Egl;
 using Avalonia.Platform;
 using Avalonia.Rendering;
-using Avalonia.Rendering.Composition;
-using Avalonia.OpenGL;
+using Avalonia.Shared.PlatformSupport;
+using Avalonia.Skia;
 
 namespace Avalonia
 {
@@ -17,66 +21,65 @@ namespace Avalonia
     {
         public static T UseAndroid<T>(this T builder) where T : AppBuilderBase<T>, new()
         {
-            return builder
-                .UseWindowingSubsystem(() => AndroidPlatform.Initialize(), "Android")
-                .UseSkia();
+            builder.UseWindowingSubsystem(() => Android.AndroidPlatform.Initialize(builder.Instance), "Android");
+            builder.UseSkia();
+            return builder;
         }
     }
 }
 
 namespace Avalonia.Android
 {
-    class AndroidPlatform : IPlatformSettings
+    class AndroidPlatform : IPlatformSettings, IWindowingPlatform
     {
         public static readonly AndroidPlatform Instance = new AndroidPlatform();
-        public static AndroidPlatformOptions Options { get; private set; }
+        public Size DoubleClickSize => new Size(4, 4);
+        public TimeSpan DoubleClickTime => TimeSpan.FromMilliseconds(200);
+        public double RenderScalingFactor => _scalingFactor;
+        public double LayoutScalingFactor => _scalingFactor;
 
-        /// <inheritdoc cref="IPlatformSettings.TouchDoubleClickSize"/>
-        public Size TouchDoubleClickSize => new Size(4, 4);
+        private readonly double _scalingFactor = 1;
 
-        /// <inheritdoc cref="IPlatformSettings.TouchDoubleClickTime"/>
-        public TimeSpan TouchDoubleClickTime => TimeSpan.FromMilliseconds(200);
-
-        public Size DoubleClickSize => TouchDoubleClickSize;
-
-        public TimeSpan DoubleClickTime => TimeSpan.FromMilliseconds(500);
-
-        internal static Compositor Compositor { get; private set; }
-
-        public static void Initialize()
+        public AndroidPlatform()
         {
-            Options = AvaloniaLocator.Current.GetService<AndroidPlatformOptions>() ?? new AndroidPlatformOptions();
+            _scalingFactor = global::Android.App.Application.Context.Resources.DisplayMetrics.ScaledDensity;
+        }
 
+        public static void Initialize(Avalonia.Application app)
+        {
             AvaloniaLocator.CurrentMutable
                 .Bind<IClipboard>().ToTransient<ClipboardImpl>()
-                .Bind<ICursorFactory>().ToTransient<CursorFactory>()
-                .Bind<IWindowingPlatform>().ToConstant(new WindowingPlatformStub())
+                .Bind<IStandardCursorFactory>().ToTransient<CursorFactory>()
                 .Bind<IKeyboardDevice>().ToSingleton<AndroidKeyboardDevice>()
+                .Bind<IMouseDevice>().ToSingleton<AndroidMouseDevice>()
                 .Bind<IPlatformSettings>().ToConstant(Instance)
+                .Bind<IRendererFactory>().ToConstant(ImmediateRenderer.Factory)
                 .Bind<IPlatformThreadingInterface>().ToConstant(new AndroidThreadingInterface())
-                .Bind<IPlatformIconLoader>().ToSingleton<PlatformIconLoaderStub>()
-                .Bind<IRenderTimer>().ToConstant(new ChoreographerTimer())
-                .Bind<IRenderLoop>().ToConstant(new RenderLoop())
-                .Bind<PlatformHotkeyConfiguration>().ToSingleton<PlatformHotkeyConfiguration>();
+                .Bind<ISystemDialogImpl>().ToTransient<SystemDialogImpl>()
+                .Bind<IWindowingPlatform>().ToConstant(Instance)
+                .Bind<IPlatformIconLoader>().ToSingleton<PlatformIconLoader>()
+                .Bind<IRenderLoop>().ToConstant(new DefaultRenderLoop(60))
 
-            if (Options.UseGpu)
-            {
-                EglPlatformOpenGlInterface.TryInitialize();
-            }
-            
-            if (Options.UseCompositor)
-            {
-                Compositor = new Compositor(
-                    AvaloniaLocator.Current.GetRequiredService<IRenderLoop>(),
-                    AvaloniaLocator.Current.GetService<IPlatformOpenGlInterface>());
-            }
+                .Bind<IAssetLoader>().ToConstant(new AssetLoader(app.GetType().Assembly));
+
+            SkiaPlatform.Initialize();
+            ((global::Android.App.Application) global::Android.App.Application.Context.ApplicationContext)
+                .RegisterActivityLifecycleCallbacks(new ActivityTracker());
         }
-    }
 
-    public sealed class AndroidPlatformOptions
-    {
-        public bool UseDeferredRendering { get; set; } = false;
-        public bool UseGpu { get; set; } = true;
-        public bool UseCompositor { get; set; } = true;
+        public IWindowImpl CreateWindow()
+        {
+            throw new NotSupportedException();
+        }
+
+        public IEmbeddableWindowImpl CreateEmbeddableWindow()
+        {
+            throw new NotSupportedException();
+        }
+
+        public IPopupImpl CreatePopup()
+        {
+            return new PopupImpl();
+        }
     }
 }

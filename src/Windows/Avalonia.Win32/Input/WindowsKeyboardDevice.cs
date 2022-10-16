@@ -1,6 +1,9 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System.Text;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Utilities;
 using Avalonia.Win32.Interop;
 
 namespace Avalonia.Win32.Input
@@ -11,31 +14,31 @@ namespace Avalonia.Win32.Input
 
         public new static WindowsKeyboardDevice Instance { get; } = new WindowsKeyboardDevice();
 
-        public RawInputModifiers Modifiers
+        public InputModifiers Modifiers
         {
             get
             {
                 UpdateKeyStates();
-                RawInputModifiers result = 0;
+                InputModifiers result = 0;
 
                 if (IsDown(Key.LeftAlt) || IsDown(Key.RightAlt))
                 {
-                    result |= RawInputModifiers.Alt;
+                    result |= InputModifiers.Alt;
                 }
 
                 if (IsDown(Key.LeftCtrl) || IsDown(Key.RightCtrl))
                 {
-                    result |= RawInputModifiers.Control;
+                    result |= InputModifiers.Control;
                 }
 
                 if (IsDown(Key.LeftShift) || IsDown(Key.RightShift))
                 {
-                    result |= RawInputModifiers.Shift;
+                    result |= InputModifiers.Shift;
                 }
 
                 if (IsDown(Key.LWin) || IsDown(Key.RWin))
                 {
-                    result |= RawInputModifiers.Meta;
+                    result |= InputModifiers.Windows;
                 }
 
                 return result;
@@ -44,12 +47,12 @@ namespace Avalonia.Win32.Input
 
         public void WindowActivated(Window window)
         {
-            SetFocusedElement(window, NavigationMethod.Unspecified, KeyModifiers.None);
+            SetFocusedElement(window, NavigationMethod.Unspecified, InputModifiers.None);
         }
 
         public string StringFromVirtualKey(uint virtualKey)
         {
-            var result = StringBuilderCache.Acquire(256);
+            StringBuilder result = new StringBuilder(256);
             int length = UnmanagedMethods.ToUnicode(
                 virtualKey,
                 0,
@@ -57,7 +60,7 @@ namespace Avalonia.Win32.Input
                 result,
                 256,
                 0);
-            return StringBuilderCache.GetStringAndRelease(result);
+            return result.ToString();
         }
 
         private void UpdateKeyStates()

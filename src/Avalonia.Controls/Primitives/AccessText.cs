@@ -1,9 +1,9 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
-using System.Diagnostics.CodeAnalysis;
-using Avalonia.Automation.Peers;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Media.TextFormatting;
 
 namespace Avalonia.Controls.Primitives
 {
@@ -21,14 +21,14 @@ namespace Avalonia.Controls.Primitives
         /// <summary>
         /// The access key handler for the current window.
         /// </summary>
-        private IAccessKeyHandler? _accessKeys;
+        private IAccessKeyHandler _accessKeys;
 
         /// <summary>
         /// Initializes static members of the <see cref="AccessText"/> class.
         /// </summary>
         static AccessText()
         {
-            AffectsRender<AccessText>(ShowAccessKeyProperty);
+            AffectsRender(ShowAccessKeyProperty);
         }
 
         /// <summary>
@@ -69,8 +69,8 @@ namespace Avalonia.Controls.Primitives
 
             if (underscore != -1 && ShowAccessKey)
             {
-                var rect = TextLayout!.HitTestTextPosition(underscore);
-                var offset = new Vector(0, -1.5);
+                var rect = FormattedText.HitTestTextPosition(underscore);
+                var offset = new Vector(0, -0.5);
                 context.DrawLine(
                     new Pen(Foreground, 1),
                     rect.BottomLeft + offset,
@@ -78,10 +78,32 @@ namespace Avalonia.Controls.Primitives
             }
         }
 
-        /// <inheritdoc/>
-        protected override TextLayout CreateTextLayout(string? text)
+        /// <summary>
+        /// Creates the <see cref="FormattedText"/> used to render the text.
+        /// </summary>
+        /// <param name="constraint">The constraint of the text.</param>
+        /// <returns>A <see cref="FormattedText"/> object.</returns>
+        protected override FormattedText CreateFormattedText(Size constraint)
         {
-            return base.CreateTextLayout(RemoveAccessKeyMarker(text));
+            return new FormattedText
+            {
+                Constraint = constraint,
+                Typeface = new Typeface(FontFamily, FontSize, FontStyle, FontWeight),
+                Text = StripAccessKey(Text),
+                TextAlignment = TextAlignment,
+                Wrapping = TextWrapping,
+            };
+        }
+
+        /// <summary>
+        /// Measures the control.
+        /// </summary>
+        /// <param name="availableSize">The available size for the control.</param>
+        /// <returns>The desired size.</returns>
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var result = base.MeasureOverride(availableSize);
+            return result.WithHeight(result.Height + 1);
         }
 
         /// <inheritdoc/>
@@ -108,47 +130,30 @@ namespace Avalonia.Controls.Primitives
             }
         }
 
-        protected override AutomationPeer OnCreateAutomationPeer()
+        /// <summary>
+        /// Returns a string with the first underscore stripped.
+        /// </summary>
+        /// <param name="text">The text.</param>
+        /// <returns>The text with the first underscore stripped.</returns>
+        private string StripAccessKey(string text)
         {
-            return new NoneAutomationPeer(this);
-        }
+            var position = text.IndexOf('_');
 
-        internal static string? RemoveAccessKeyMarker(string? text)
-        {
-            if (!string.IsNullOrEmpty(text))
+            if (position == -1)
             {
-                var accessKeyMarker = "_";
-                var doubleAccessKeyMarker = accessKeyMarker + accessKeyMarker;
-                int index = FindAccessKeyMarker(text);
-                if (index >= 0 && index < text.Length - 1)
-                    text = text.Remove(index, 1);
-                text = text.Replace(doubleAccessKeyMarker, accessKeyMarker);
+                return text;
             }
-            return text;
-        }
-
-        private static int FindAccessKeyMarker(string text)
-        {
-            var length = text.Length;
-            var startIndex = 0;
-            while (startIndex < length)
+            else
             {
-                int index = text.IndexOf('_', startIndex);
-                if (index == -1)
-                    return -1;
-                if (index + 1 < length && text[index + 1] != '_')
-                    return index;
-                startIndex = index + 2;
+                return text.Substring(0, position) + text.Substring(position + 1);
             }
-
-            return -1;
         }
 
         /// <summary>
         /// Called when the <see cref="TextBlock.Text"/> property changes.
         /// </summary>
         /// <param name="text">The new text.</param>
-        private void TextChanged(string? text)
+        private void TextChanged(string text)
         {
             var key = (char)0;
 

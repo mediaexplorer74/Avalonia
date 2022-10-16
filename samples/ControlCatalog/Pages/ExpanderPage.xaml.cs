@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using ControlCatalog.ViewModels;
 
 namespace ControlCatalog.Pages
 {
@@ -9,7 +8,6 @@ namespace ControlCatalog.Pages
         public ExpanderPage()
         {
             this.InitializeComponent();
-            DataContext = new ExpanderPageViewModel();
         }
 
         private void InitializeComponent()

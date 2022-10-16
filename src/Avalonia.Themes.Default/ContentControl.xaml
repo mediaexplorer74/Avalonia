@@ -1,0 +1,13 @@
+<Style xmlns="https://github.com/avaloniaui" Selector="ContentControl">
+  <Setter Property="Template">
+    <ControlTemplate>
+      <ContentPresenter Name="PART_ContentPresenter"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        Padding="{TemplateBinding Padding}"/>
+    </ControlTemplate>
+  </Setter>
+</Style>

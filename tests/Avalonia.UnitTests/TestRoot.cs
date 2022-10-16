@@ -1,117 +1,81 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
-using Avalonia.LogicalTree;
-using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering;
 using Avalonia.Styling;
-using Avalonia.VisualTree;
 using Moq;
 
 namespace Avalonia.UnitTests
 {
-    public class TestRoot : Decorator, IFocusScope, ILayoutRoot, IInputRoot, IRenderRoot, IStyleHost, ILogicalRoot
+    public class TestRoot : Decorator, IFocusScope, ILayoutRoot, INameScope, IRenderRoot, IStyleRoot
     {
         private readonly NameScope _nameScope = new NameScope();
+        private readonly IRenderTarget _renderTarget = Mock.Of<IRenderTarget>(
+            x => x.CreateDrawingContext(It.IsAny<IVisualBrushRenderer>()) == Mock.Of<IDrawingContextImpl>());
 
         public TestRoot()
         {
-            Renderer = Mock.Of<IRenderer>();
-            LayoutManager = new LayoutManager(this);
-            IsVisible = true;
-            KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
+            var rendererFactory = AvaloniaLocator.Current.GetService<IRendererFactory>();
+            var renderLoop = AvaloniaLocator.Current.GetService<IRenderLoop>();
+            Renderer = rendererFactory?.CreateRenderer(this, renderLoop);
         }
 
-        public TestRoot(IControl child)
-            : this(false, child)
+        event EventHandler<NameScopeEventArgs> INameScope.Registered
         {
-            Child = child;
+            add { _nameScope.Registered += value; ++NameScopeRegisteredSubscribers; }
+            remove { _nameScope.Registered -= value; --NameScopeRegisteredSubscribers; }
         }
 
-        public TestRoot(bool useGlobalStyles, IControl child)
-            : this()
+        public event EventHandler<NameScopeEventArgs> Unregistered
         {
-            if (useGlobalStyles)
-            {
-                StylingParent = UnitTestApplication.Current;
-            }
-
-            Child = child;
+            add { _nameScope.Unregistered += value; ++NameScopeUnregisteredSubscribers; }
+            remove { _nameScope.Unregistered -= value; --NameScopeUnregisteredSubscribers; }
         }
 
-        public Size ClientSize { get; set; } = new Size(1000, 1000);
+        public int NameScopeRegisteredSubscribers { get; private set; }
 
-        public Size MaxClientSize { get; set; } = Size.Infinity;
+        public int NameScopeUnregisteredSubscribers { get; private set; }
 
-        public double LayoutScaling { get; set; } = 1;
+        public Size ClientSize => new Size(100, 100);
 
-        public ILayoutManager LayoutManager { get; set; }
+        public Size MaxClientSize => Size.Infinity;
 
-        public double RenderScaling => 1;
+        public double LayoutScaling => 1;
+
+        public ILayoutManager LayoutManager => AvaloniaLocator.Current.GetService<ILayoutManager>();
+
+        public IRenderTarget RenderTarget => null;
 
         public IRenderer Renderer { get; set; }
 
-        public IAccessKeyHandler AccessKeyHandler => null;
-
-        public IKeyboardNavigationHandler KeyboardNavigationHandler => null;
-
-        public IInputElement PointerOverElement { get; set; }
-        
-        public bool ShowAccessKeys { get; set; }
-
-        public IStyleHost StylingParent { get; set; }
-
-        IStyleHost IStyleHost.StylingParent => StylingParent;
-
-        public IRenderTarget CreateRenderTarget()
-        {
-            var dc = new Mock<IDrawingContextImpl>();
-            dc.Setup(x => x.CreateLayer(It.IsAny<Size>())).Returns(() =>
-            {
-                var layerDc = new Mock<IDrawingContextImpl>();
-                var layer = new Mock<IDrawingContextLayerImpl>();
-                layer.Setup(x => x.CreateDrawingContext(It.IsAny<IVisualBrushRenderer>())).Returns(layerDc.Object);
-                return layer.Object;
-            });
-
-            var result = new Mock<IRenderTarget>();
-            result.Setup(x => x.CreateDrawingContext(It.IsAny<IVisualBrushRenderer>())).Returns(dc.Object);
-            return result.Object;
-        }
+        public IRenderTarget CreateRenderTarget() => _renderTarget;
 
         public void Invalidate(Rect rect)
         {
         }
 
-        public Point PointToClient(PixelPoint p) => p.ToPoint(1);
+        public Point PointToClient(Point p) => p;
 
-        public PixelPoint PointToScreen(Point p) => PixelPoint.FromPoint(p, 1);
+        public Point PointToScreen(Point p) => p;
 
-        public void RegisterChildrenNames()
+        void INameScope.Register(string name, object element)
         {
-            var scope = NameScope.GetNameScope(this) ?? new NameScope();
-            NameScope.SetNameScope(this, scope);
-            void Visit(StyledElement element, bool force = false)
-            {
-                if (element.Name != null)
-                {
-                    if (scope.Find(element.Name) != element)
-                        scope.Register(element.Name, element);
-                }
-
-                if(element is IVisual visual && (force || NameScope.GetNameScope(element) == null))
-                    foreach(var child in visual.GetVisualChildren())
-                        if (child is StyledElement styledChild)
-                            Visit(styledChild);
-            }
-            Visit(this, true);
+            _nameScope.Register(name, element);
         }
 
-        protected override Size MeasureOverride(Size availableSize)
+        object INameScope.Find(string name)
         {
-            return base.MeasureOverride(ClientSize);
+            return _nameScope.Find(name);
+        }
+
+        void INameScope.Unregister(string name)
+        {
+            _nameScope.Unregister(name);
         }
     }
 }

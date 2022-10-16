@@ -1,10 +1,13 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections;
 
 namespace Avalonia.Controls.Templates
 {
     /// <summary>
-    /// A template used to build hierarchical data.
+    /// A template used to build hierachical data.
     /// </summary>
     /// <typeparam name="T">The type of the template's data.</typeparam>
     public class FuncTreeDataTemplate<T> : FuncTreeDataTemplate
@@ -20,7 +23,7 @@ namespace Avalonia.Controls.Templates
         /// items.
         /// </param>
         public FuncTreeDataTemplate(
-            Func<T, INameScope, Control> build,
+            Func<T, Control> build,
             Func<T, IEnumerable> itemsSelector)
             : base(
                 typeof(T),
@@ -43,7 +46,7 @@ namespace Avalonia.Controls.Templates
         /// </param>
         public FuncTreeDataTemplate(
             Func<T, bool> match,
-            Func<T, INameScope, Control> build,
+            Func<T, Control> build,
             Func<T, IEnumerable> itemsSelector)
             : base(
                 CastMatch(match),
@@ -57,7 +60,7 @@ namespace Avalonia.Controls.Templates
         /// </summary>
         /// <param name="f">The typed function.</param>
         /// <returns>The untyped function.</returns>
-        private static Func<object?, bool> CastMatch(Func<T, bool> f)
+        private static Func<object, bool> CastMatch(Func<T, bool> f)
         {
             return o => (o is T) && f((T)o);
         }
@@ -68,20 +71,9 @@ namespace Avalonia.Controls.Templates
         /// <typeparam name="TResult">The result.</typeparam>
         /// <param name="f">The typed function.</param>
         /// <returns>The untyped function.</returns>
-        private static Func<object?, INameScope, TResult> Cast<TResult>(Func<T, INameScope, TResult> f)
+        private static Func<object, TResult> Cast<TResult>(Func<T, TResult> f)
         {
-            return (o, s) => f((T)o!, s);
-        }
-        
-        /// <summary>
-        /// Casts a function with a typed parameter to an untyped function.
-        /// </summary>
-        /// <typeparam name="TResult">The result.</typeparam>
-        /// <param name="f">The typed function.</param>
-        /// <returns>The untyped function.</returns>
-        private static Func<object?, TResult> Cast<TResult>(Func<T, TResult> f)
-        {
-            return o => f((T)o!);
+            return o => f((T)o);
         }
     }
 }

@@ -1,11 +1,11 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
 using System.Collections;
 using System.Collections.Specialized;
-using Avalonia.Collections;
 using Avalonia.Controls.Generators;
 using Avalonia.Controls.Templates;
-using Avalonia.Controls.Utils;
-using Avalonia.LogicalTree;
 using Avalonia.Styling;
 
 namespace Avalonia.Controls.Presenters
@@ -13,12 +13,12 @@ namespace Avalonia.Controls.Presenters
     /// <summary>
     /// Base class for controls that present items inside an <see cref="ItemsControl"/>.
     /// </summary>
-    public abstract class ItemsPresenterBase : Control, IItemsPresenter, ITemplatedControl, IChildIndexProvider
+    public abstract class ItemsPresenterBase : Control, IItemsPresenter, ITemplatedControl
     {
         /// <summary>
         /// Defines the <see cref="Items"/> property.
         /// </summary>
-        public static readonly DirectProperty<ItemsPresenterBase, IEnumerable?> ItemsProperty =
+        public static readonly DirectProperty<ItemsPresenterBase, IEnumerable> ItemsProperty =
             ItemsControl.ItemsProperty.AddOwner<ItemsPresenterBase>(o => o.Items, (o, v) => o.Items = v);
 
         /// <summary>
@@ -30,27 +30,31 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Defines the <see cref="ItemTemplate"/> property.
         /// </summary>
-        public static readonly StyledProperty<IDataTemplate?> ItemTemplateProperty =
+        public static readonly StyledProperty<IDataTemplate> ItemTemplateProperty =
             ItemsControl.ItemTemplateProperty.AddOwner<ItemsPresenterBase>();
 
-        private IEnumerable? _items;
-        private IDisposable? _itemsSubscription;
+        /// <summary>
+        /// Defines the <see cref="MemberSelector"/> property.
+        /// </summary>
+        public static readonly StyledProperty<IMemberSelector> MemberSelectorProperty =
+            ItemsControl.MemberSelectorProperty.AddOwner<ItemsPresenterBase>();
+
+        private IEnumerable _items;
         private bool _createdPanel;
-        private IItemContainerGenerator? _generator;
-        private EventHandler<ChildIndexChangedEventArgs>? _childIndexChanged;
+        private IItemContainerGenerator _generator;
 
         /// <summary>
         /// Initializes static members of the <see cref="ItemsPresenter"/> class.
         /// </summary>
         static ItemsPresenterBase()
         {
-            TemplatedParentProperty.Changed.AddClassHandler<ItemsPresenterBase>((x,e) => x.TemplatedParentChanged(e));
+            TemplatedParentProperty.Changed.AddClassHandler<ItemsPresenterBase>(x => x.TemplatedParentChanged);
         }
 
         /// <summary>
         /// Gets or sets the items to be displayed.
         /// </summary>
-        public IEnumerable? Items
+        public IEnumerable Items
         {
             get
             {
@@ -59,12 +63,24 @@ namespace Avalonia.Controls.Presenters
 
             set
             {
-                _itemsSubscription?.Dispose();
-                _itemsSubscription = null;
-
-                if (!IsHosted && _createdPanel && value is INotifyCollectionChanged incc)
+                if (_createdPanel)
                 {
-                    _itemsSubscription = incc.WeakSubscribe(ItemsCollectionChanged);
+                    INotifyCollectionChanged incc = _items as INotifyCollectionChanged;
+
+                    if (incc != null)
+                    {
+                        incc.CollectionChanged -= ItemsCollectionChanged;
+                    }
+                }
+
+                if (_createdPanel && value != null)
+                {
+                    INotifyCollectionChanged incc = value as INotifyCollectionChanged;
+
+                    if (incc != null)
+                    {
+                        incc.CollectionChanged += ItemsCollectionChanged;
+                    }
                 }
 
                 SetAndRaise(ItemsProperty, ref _items, value);
@@ -114,27 +130,28 @@ namespace Avalonia.Controls.Presenters
         /// <summary>
         /// Gets or sets the data template used to display the items in the control.
         /// </summary>
-        public IDataTemplate? ItemTemplate
+        public IDataTemplate ItemTemplate
         {
             get { return GetValue(ItemTemplateProperty); }
             set { SetValue(ItemTemplateProperty, value); }
         }
 
         /// <summary>
+        /// Selects a member from <see cref="Items"/> to use as the list item.
+        /// </summary>
+        public IMemberSelector MemberSelector
+        {
+            get { return GetValue(MemberSelectorProperty); }
+            set { SetValue(MemberSelectorProperty, value); }
+        }
+
+        /// <summary>
         /// Gets the panel used to display the items.
         /// </summary>
-        public IPanel? Panel
+        public IPanel Panel
         {
             get;
             private set;
-        }
-
-        protected bool IsHosted => TemplatedParent is IItemsPresenterHost;
-
-        event EventHandler<ChildIndexChangedEventArgs>? IChildIndexProvider.ChildIndexChanged
-        {
-            add => _childIndexChanged += value;
-            remove => _childIndexChanged -= value;
         }
 
         /// <inheritdoc/>
@@ -147,19 +164,8 @@ namespace Avalonia.Controls.Presenters
         }
 
         /// <inheritdoc/>
-        public virtual void ScrollIntoView(int index)
+        public virtual void ScrollIntoView(object item)
         {
-        }
-
-        /// <inheritdoc/>
-        void IItemsPresenter.ItemsChanged(NotifyCollectionChangedEventArgs e)
-        {
-            if (Panel != null)
-            {
-                ItemsChanged(e);
-
-                _childIndexChanged?.Invoke(this, ChildIndexChangedEventArgs.Empty);
-            }
         }
 
         /// <summary>
@@ -179,32 +185,20 @@ namespace Avalonia.Controls.Presenters
                 result.ItemTemplate = ItemTemplate;
             }
 
-            result.Materialized += ContainerActionHandler;
-            result.Dematerialized += ContainerActionHandler;
-            result.Recycled += ContainerActionHandler;
-
             return result;
-        }
-
-        private void ContainerActionHandler(object? sender, ItemContainerEventArgs e)
-        {
-            for (var i = 0; i < e.Containers.Count; i++)
-            {
-                _childIndexChanged?.Invoke(this, new ChildIndexChangedEventArgs(e.Containers[i].ContainerControl));
-            }
         }
 
         /// <inheritdoc/>
         protected override Size MeasureOverride(Size availableSize)
         {
-            Panel!.Measure(availableSize);
+            Panel.Measure(availableSize);
             return Panel.DesiredSize;
         }
 
         /// <inheritdoc/>
         protected override Size ArrangeOverride(Size finalSize)
         {
-            Panel!.Arrange(new Rect(finalSize));
+            Panel.Arrange(new Rect(finalSize));
             return finalSize;
         }
 
@@ -221,13 +215,7 @@ namespace Avalonia.Controls.Presenters
         /// has been set, the items collection has been modified, or the panel has been created.
         /// </summary>
         /// <param name="e">A description of the change.</param>
-        /// <remarks>
-        /// The panel is guaranteed to be created when this method is called.
-        /// </remarks>
-        protected virtual void ItemsChanged(NotifyCollectionChangedEventArgs e)
-        {
-            ItemContainerSync.ItemsChanged(this, Items, e);
-        }
+        protected abstract void ItemsChanged(NotifyCollectionChangedEventArgs e);
 
         /// <summary>
         /// Creates the <see cref="Panel"/> when <see cref="ApplyTemplate"/> is called for the first
@@ -245,12 +233,16 @@ namespace Avalonia.Controls.Presenters
 
             _createdPanel = true;
 
-            if (!IsHosted && _itemsSubscription == null && Items is INotifyCollectionChanged incc)
+            INotifyCollectionChanged incc = Items as INotifyCollectionChanged;
+
+            if (incc != null)
             {
-                _itemsSubscription = incc.WeakSubscribe(ItemsCollectionChanged);
+                incc.CollectionChanged += ItemsCollectionChanged;
             }
 
             PanelCreated(Panel);
+
+            ItemsChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         /// <summary>
@@ -258,7 +250,7 @@ namespace Avalonia.Controls.Presenters
         /// </summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The event args.</param>
-        private void ItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        private void ItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             if (_createdPanel)
             {
@@ -269,23 +261,6 @@ namespace Avalonia.Controls.Presenters
         private void TemplatedParentChanged(AvaloniaPropertyChangedEventArgs e)
         {
             (e.NewValue as IItemsPresenterHost)?.RegisterItemsPresenter(this);
-        }
-
-        int IChildIndexProvider.GetChildIndex(ILogical child)
-        {
-            if (child is IControl control && ItemContainerGenerator is { } generator)
-            {
-                var index = ItemContainerGenerator.IndexFromContainer(control);
-
-                return index;
-            }
-
-            return -1;
-        }
-
-        bool IChildIndexProvider.TryGetTotalCount(out int count)
-        {
-            return Items.TryGetCountFast(out count);
         }
     }
 }

@@ -1,88 +1,90 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Reactive.Disposables;
+using System.Text;
 using System.Threading;
-
+using Android.App;
+using Android.Content;
 using Android.OS;
-
+using Android.Runtime;
+using Android.Views;
+using Android.Widget;
 using Avalonia.Platform;
-using Avalonia.Threading;
-
-using App = Android.App.Application;
 
 namespace Avalonia.Android
 {
-    internal sealed class AndroidThreadingInterface : IPlatformThreadingInterface
+    class AndroidThreadingInterface : IPlatformThreadingInterface
     {
         private Handler _handler;
-        private static Thread s_uiThread;
 
         public AndroidThreadingInterface()
         {
-            _handler = new Handler(App.Context.MainLooper);
+            _handler = new Handler(global::Android.App.Application.Context.MainLooper);
         }
 
-        public void RunLoop(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public void RunLoop(CancellationToken cancellationToken)
+        {
+            return;
+        }
 
-        public IDisposable StartTimer(DispatcherPriority priority, TimeSpan interval, Action tick)
+        public IDisposable StartTimer(TimeSpan interval, Action tick)
         {
             if (interval.TotalMilliseconds < 10)
                 interval = TimeSpan.FromMilliseconds(10);
-
+            object l = new object();
             var stopped = false;
             Timer timer = null;
+            var scheduled = false;
             timer = new Timer(_ =>
             {
-                if (stopped)
-                    return;
-
-                EnsureInvokeOnMainThread(() =>
+                lock (l)
                 {
-                    try
+                    if (stopped)
                     {
-                        tick();
+                        timer.Dispose();
+                        return;
                     }
-                    finally
+                    if (scheduled)
+                        return;
+                    scheduled = true;
+                    EnsureInvokeOnMainThread(() =>
                     {
-                        if (!stopped)
-                            timer.Change(interval, Timeout.InfiniteTimeSpan);
-                    }
-                });
-            },
-            null, interval, Timeout.InfiniteTimeSpan);
-
+                        try
+                        {
+                            tick();
+                        }
+                        finally
+                        {
+                            lock (l)
+                            {
+                                scheduled = false;
+                            }
+                        }
+                    });
+                }
+            }, null, TimeSpan.Zero, interval);
+            
             return Disposable.Create(() =>
             {
-                stopped = true;
-                timer.Dispose();
+                lock (l)
+                {
+                    stopped = true;
+                    timer.Dispose();
+                }
             });
         }
 
         private void EnsureInvokeOnMainThread(Action action) => _handler.Post(action);
 
-        public void Signal(DispatcherPriority prio)
+        public void Signal()
         {
-            EnsureInvokeOnMainThread(() => Signaled?.Invoke(null));
+            EnsureInvokeOnMainThread(() => Signaled?.Invoke());
         }
 
-        public bool CurrentThreadIsLoopThread
-        {
-            get
-            {
-                if (s_uiThread != null)
-                    return s_uiThread == Thread.CurrentThread;
-
-                var isOnMainThread = OperatingSystem.IsAndroidVersionAtLeast(23)
-                    ? Looper.MainLooper.IsCurrentThread
-                    : Looper.MainLooper.Thread.Equals(Java.Lang.Thread.CurrentThread());
-                if (isOnMainThread)
-                {
-                    s_uiThread = Thread.CurrentThread;
-                    return true;
-                }
-
-                return false;
-            }
-        }
-        public event Action<DispatcherPriority?> Signaled;
+        public bool CurrentThreadIsLoopThread => Looper.MainLooper.Thread.Equals(Java.Lang.Thread.CurrentThread());
+        public event Action Signaled;
     }
 }
+ 

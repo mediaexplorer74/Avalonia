@@ -1,6 +1,11 @@
-﻿using System.IO;
+﻿using Avalonia.Platform;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform;
 
 namespace Avalonia.Controls
 {
@@ -11,17 +16,17 @@ namespace Avalonia.Controls
     {
         public WindowIcon(IBitmap bitmap)
         {
-            PlatformImpl = AvaloniaLocator.Current.GetRequiredService<IPlatformIconLoader>().LoadIcon(bitmap.PlatformImpl.Item);
+            PlatformImpl = AvaloniaLocator.Current.GetService<IPlatformIconLoader>().LoadIcon(bitmap.PlatformImpl);
         }
 
         public WindowIcon(string fileName)
         {
-            PlatformImpl = AvaloniaLocator.Current.GetRequiredService<IPlatformIconLoader>().LoadIcon(fileName);
+            PlatformImpl = AvaloniaLocator.Current.GetService<IPlatformIconLoader>().LoadIcon(fileName);
         }
 
         public WindowIcon(Stream stream)
         {
-            PlatformImpl = AvaloniaLocator.Current.GetRequiredService<IPlatformIconLoader>().LoadIcon(stream);
+            PlatformImpl = AvaloniaLocator.Current.GetService<IPlatformIconLoader>().LoadIcon(stream);
         }
 
         public IWindowIconImpl PlatformImpl { get; }

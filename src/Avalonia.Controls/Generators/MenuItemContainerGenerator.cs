@@ -1,4 +1,10 @@
-﻿namespace Avalonia.Controls.Generators
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Avalonia.Controls.Generators
 {
     public class MenuItemContainerGenerator : ItemContainerGenerator<MenuItem>
     {
@@ -12,7 +18,7 @@
         }
 
         /// <inheritdoc/>
-        protected override IControl? CreateContainer(object item)
+        protected override IControl CreateContainer(object item)
         {
             var separator = item as Separator;
             return separator != null ? separator : base.CreateContainer(item);

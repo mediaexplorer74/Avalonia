@@ -1,10 +1,11 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System.Linq;
 using Avalonia.Media;
-using Avalonia.Metadata;
 
 namespace Avalonia.Direct2D1.Media
 {
-    [Unstable]
     public class RadialGradientBrushImpl : BrushImpl
     {
         public RadialGradientBrushImpl(
@@ -24,11 +25,11 @@ namespace Avalonia.Direct2D1.Media
             }).ToArray();
 
             var centerPoint = brush.Center.ToPixels(destinationSize);
-            var gradientOrigin = brush.GradientOrigin.ToPixels(destinationSize) - centerPoint;
+            var GradientOriginOffset = brush.GradientOrigin.ToPixels(destinationSize);
             
             // Note: Direct2D supports RadiusX and RadiusY but Cairo backend supports only Radius property
-            var radiusX = brush.Radius * destinationSize.Width;
-            var radiusY = brush.Radius * destinationSize.Height;
+            var radiusX = brush.Radius;
+            var radiusY = brush.Radius;
 
             using (var stops = new SharpDX.Direct2D1.GradientStopCollection(
                 target,
@@ -40,7 +41,7 @@ namespace Avalonia.Direct2D1.Media
                     new SharpDX.Direct2D1.RadialGradientBrushProperties
                     {
                         Center = centerPoint.ToSharpDX(),
-                        GradientOriginOffset = gradientOrigin.ToSharpDX(),
+                        GradientOriginOffset = GradientOriginOffset.ToSharpDX(),
                         RadiusX = (float)radiusX,
                         RadiusY = (float)radiusY
                     },

@@ -1,4 +1,6 @@
-using System.Threading.Tasks;
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
@@ -6,7 +8,9 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Xunit;
 
-#if AVALONIA_SKIA
+#if AVALONIA_CAIRO
+namespace Avalonia.Cairo.RenderTests.Media
+#elif AVALONIA_SKIA
 namespace Avalonia.Skia.RenderTests
 #else
 namespace Avalonia.Direct2D1.RenderTests.Media
@@ -26,11 +30,11 @@ namespace Avalonia.Direct2D1.RenderTests.Media
 
         private Control Visual
         {
-            get
+            get 
             {
                 return new Panel
                 {
-                    Children =
+                    Children = new Avalonia.Controls.Controls
                     {
                         new Image
                         {
@@ -39,14 +43,16 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                         new Border
                         {
                             BorderBrush = Brushes.Blue,
-                            BorderThickness = new Thickness(2),
+                            BorderThickness = 2,
                             HorizontalAlignment = HorizontalAlignment.Center,
                             VerticalAlignment = VerticalAlignment.Center,
-                            Child = new Panel
+                            Child = new TextBlock
                             {
-                                Height = 26,
-                                Width = 150,
-                                Background = Brushes.Green
+                                FontSize = 24,
+                                FontFamily = "Arial",
+                                Background = Brushes.Green,
+                                Foreground = Brushes.Yellow,
+                                Text = "VisualBrush",
                             }
                         }
                     }
@@ -55,7 +61,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
         }
 
         [Fact]
-        public async Task VisualBrush_NoStretch_NoTile_Alignment_TopLeft()
+        public void VisualBrush_NoStretch_NoTile_Alignment_TopLeft()
         {
             Decorator target = new Decorator
             {
@@ -75,12 +81,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "Font scaling currently broken on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_NoStretch_NoTile_Alignment_Center()
+#endif
+        public void VisualBrush_NoStretch_NoTile_Alignment_Center()
         {
             Decorator target = new Decorator
             {
@@ -100,12 +112,12 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
         [Fact]
-        public async Task VisualBrush_NoStretch_NoTile_Alignment_BottomRight()
+        public void VisualBrush_NoStretch_NoTile_Alignment_BottomRight()
         {
             Decorator target = new Decorator
             {
@@ -125,12 +137,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "Font scaling currently broken on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_Fill_NoTile()
+#endif
+        public void VisualBrush_Fill_NoTile()
         {
             Decorator target = new Decorator
             {
@@ -148,12 +166,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "Font scaling currently broken on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_Uniform_NoTile()
+#endif
+        public void VisualBrush_Uniform_NoTile()
         {
             Decorator target = new Decorator
             {
@@ -171,12 +195,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "Font scaling currently broken on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_UniformToFill_NoTile()
+#endif
+        public void VisualBrush_UniformToFill_NoTile()
         {
             Decorator target = new Decorator
             {
@@ -194,12 +224,12 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
         [Fact]
-        public async Task VisualBrush_NoStretch_NoTile_BottomRightQuarterSource()
+        public void VisualBrush_NoStretch_NoTile_BottomRightQuarterSource()
         {
             Decorator target = new Decorator
             {
@@ -218,12 +248,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "Font scaling currently broken on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_NoStretch_NoTile_BottomRightQuarterDest()
+#endif
+        public void VisualBrush_NoStretch_NoTile_BottomRightQuarterDest()
         {
             Decorator target = new Decorator
             {
@@ -242,12 +278,16 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_NoStretch_NoTile_BottomRightQuarterSource_BottomRightQuarterDest()
+#endif
+        public void VisualBrush_NoStretch_NoTile_BottomRightQuarterSource_BottomRightQuarterDest()
         {
             Decorator target = new Decorator
             {
@@ -267,12 +307,12 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
         [Fact]
-        public async Task VisualBrush_NoStretch_Tile_BottomRightQuarterSource_CenterQuarterDest()
+        public void VisualBrush_NoStretch_Tile_BottomRightQuarterSource_CenterQuarterDest()
         {
             Decorator target = new Decorator
             {
@@ -292,12 +332,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "TileMode.FlipX not yet supported on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_NoStretch_FlipX_TopLeftDest()
+#endif
+        public void VisualBrush_NoStretch_FlipX_TopLeftDest()
         {
             Decorator target = new Decorator
             {
@@ -316,12 +362,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "TileMode.FlipY not yet supported on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_NoStretch_FlipY_TopLeftDest()
+#endif
+        public void VisualBrush_NoStretch_FlipY_TopLeftDest()
         {
             Decorator target = new Decorator
             {
@@ -340,12 +392,18 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
+            RenderToFile(target);
             CompareImages();
         }
 
+#if AVALONIA_CAIRO
+        [Fact(Skip = "Font scaling currently broken on cairo")]
+#elif AVALONIA_SKIA_SKIP_FAIL
+        [Fact(Skip = "FIXME")]
+#else
         [Fact]
-        public async Task VisualBrush_NoStretch_FlipXY_TopLeftDest()
+#endif
+        public void VisualBrush_NoStretch_FlipXY_TopLeftDest()
         {
             Decorator target = new Decorator
             {
@@ -364,324 +422,7 @@ namespace Avalonia.Direct2D1.RenderTests.Media
                 }
             };
 
-            await RenderToFile(target);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task VisualBrush_InTree_Visual()
-        {
-            Border source;
-            Decorator target = new Decorator
-            {
-                Padding = new Thickness(8),
-                Width = 200,
-                Height = 200,
-                Child = new Grid
-                {
-                    RowDefinitions = new RowDefinitions("Auto,*"),
-                    Children =
-                    {
-                        (source = new Border
-                        {
-                            Background = Brushes.Yellow,
-                            HorizontalAlignment = HorizontalAlignment.Left,
-                            Child = new Panel
-                            {
-                                Height = 10,
-                                Width = 50
-                            }
-                        }),
-                        new Border
-                        {
-                            Background = new VisualBrush
-                            {
-                                Stretch = Stretch.Uniform,
-                                Visual = source,
-                            },
-                            [Grid.RowProperty] = 1,
-                        }
-                    }
-                }
-            };
-
-            await RenderToFile(target);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task VisualBrush_Grip_96_Dpi()
-        {
-            var target = new Border
-            {
-                Width = 100,
-                Height = 10,
-                Background = new VisualBrush
-                {
-                    SourceRect = new RelativeRect(0, 0, 4, 5, RelativeUnit.Absolute),
-                    DestinationRect = new RelativeRect(0, 0, 4, 5, RelativeUnit.Absolute),
-                    TileMode = TileMode.Tile,
-                    Stretch = Stretch.UniformToFill,
-                    Visual = new Canvas
-                    {
-                        Width = 4,
-                        Height = 5,
-                        Background = Brushes.WhiteSmoke,
-                        Children =
-                        {
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.LeftProperty] = 2,
-                            },
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.TopProperty] = 2,
-                            },
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.LeftProperty] = 2,
-                                [Canvas.TopProperty] = 4,
-                            }
-                        }
-                    }
-                }
-            };
-
-            await RenderToFile(target);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task VisualBrush_Grip_144_Dpi()
-        {
-            var target = new Border
-            {
-                Width = 100,
-                Height = 7.5,
-                Background = new VisualBrush
-                {
-                    SourceRect = new RelativeRect(0, 0, 4, 5, RelativeUnit.Absolute),
-                    DestinationRect = new RelativeRect(0, 0, 4, 5, RelativeUnit.Absolute),
-                    TileMode = TileMode.Tile,
-                    Stretch = Stretch.UniformToFill,
-                    Visual = new Canvas
-                    {
-                        Width = 4,
-                        Height = 5,
-                        Background = Brushes.WhiteSmoke,
-                        Children =
-                        {
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.LeftProperty] = 2,
-                            },
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.TopProperty] = 2,
-                            },
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.LeftProperty] = 2,
-                                [Canvas.TopProperty] = 4,
-                            }
-                        }
-                    }
-                }
-            };
-
-            await RenderToFile(target, dpi: 144);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task VisualBrush_Grip_192_Dpi()
-        {
-            var target = new Border
-            {
-                Width = 100,
-                Height = 10,
-                Background = new VisualBrush
-                {
-                    SourceRect = new RelativeRect(0, 0, 4, 5, RelativeUnit.Absolute),
-                    DestinationRect = new RelativeRect(0, 0, 4, 5, RelativeUnit.Absolute),
-                    TileMode = TileMode.Tile,
-                    Stretch = Stretch.UniformToFill,
-                    Visual = new Canvas
-                    {
-                        Width = 4,
-                        Height = 5,
-                        Background = Brushes.WhiteSmoke,
-                        Children =
-                        {
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.LeftProperty] = 2,
-                            },
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.TopProperty] = 2,
-                            },
-                            new Rectangle
-                            {
-                                Width = 1,
-                                Height = 1,
-                                Fill = Brushes.Red,
-                                [Canvas.LeftProperty] = 2,
-                                [Canvas.TopProperty] = 4,
-                            }
-                        }
-                    }
-                }
-            };
-
-            await RenderToFile(target, dpi: 192);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task VisualBrush_Checkerboard_96_Dpi()
-        {
-            var target = new Border
-            {
-                Width = 200,
-                Height = 200,
-                Background = new VisualBrush
-                {
-                    DestinationRect = new RelativeRect(0, 0, 16, 16, RelativeUnit.Absolute),
-                    TileMode = TileMode.Tile,
-                    Visual = new Canvas
-                    {
-                        Width = 16,
-                        Height= 16,
-                        Background = Brushes.Red,
-                        Children =
-                        {
-                            new Rectangle
-                            {
-                                Width = 8,
-                                Height = 8,
-                                Fill = Brushes.Green,
-                            },
-                            new Rectangle
-                            {
-                                Width = 8,
-                                Height = 8,
-                                Fill = Brushes.Green,
-                                [Canvas.LeftProperty] = 8,
-                                [Canvas.TopProperty] = 8,
-                            },
-                        }
-                    }
-                }
-            };
-
-            await RenderToFile(target);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task VisualBrush_Checkerboard_144_Dpi()
-        {
-            var target = new Border
-            {
-                Width = 200,
-                Height = 200,
-                Background = new VisualBrush
-                {
-                    DestinationRect = new RelativeRect(0, 0, 16, 16, RelativeUnit.Absolute),
-                    TileMode = TileMode.Tile,
-                    Visual = new Canvas
-                    {
-                        Width = 16,
-                        Height = 16,
-                        Background = Brushes.Red,
-                        Children =
-                        {
-                            new Rectangle
-                            {
-                                Width = 8,
-                                Height = 8,
-                                Fill = Brushes.Green,
-                            },
-                            new Rectangle
-                            {
-                                Width = 8,
-                                Height = 8,
-                                Fill = Brushes.Green,
-                                [Canvas.LeftProperty] = 8,
-                                [Canvas.TopProperty] = 8,
-                            },
-                        }
-                    }
-                }
-            };
-
-            await RenderToFile(target, dpi: 144);
-            CompareImages();
-        }
-
-        [Fact]
-        public async Task VisualBrush_Checkerboard_192_Dpi()
-        {
-            var target = new Border
-            {
-                Width = 200,
-                Height = 200,
-                Background = new VisualBrush
-                {
-                    DestinationRect = new RelativeRect(0, 0, 16, 16, RelativeUnit.Absolute),
-                    TileMode = TileMode.Tile,
-                    Visual = new Canvas
-                    {
-                        Width = 16,
-                        Height = 16,
-                        Background = Brushes.Red,
-                        Children =
-                        {
-                            new Rectangle
-                            {
-                                Width = 8,
-                                Height = 8,
-                                Fill = Brushes.Green,
-                            },
-                            new Rectangle
-                            {
-                                Width = 8,
-                                Height = 8,
-                                Fill = Brushes.Green,
-                                [Canvas.LeftProperty] = 8,
-                                [Canvas.TopProperty] = 8,
-                            },
-                        }
-                    }
-                }
-            };
-
-            await RenderToFile(target, dpi: 192);
+            RenderToFile(target);
             CompareImages();
         }
     }

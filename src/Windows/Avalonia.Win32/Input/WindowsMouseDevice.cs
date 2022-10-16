@@ -1,46 +1,34 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 using System;
-using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.VisualTree;
+using Avalonia.Interactivity;
 using Avalonia.Win32.Interop;
 
 namespace Avalonia.Win32.Input
 {
     class WindowsMouseDevice : MouseDevice
     {
-        private readonly IPointer _pointer;
-        public WindowsMouseDevice() : base(WindowsMousePointer.CreatePointer(out var pointer))
+        public new static WindowsMouseDevice Instance { get; } = new WindowsMouseDevice();
+
+        public WindowImpl CurrentWindow
         {
-            _pointer = pointer;
+            get;
+            set;
         }
 
-        // Normally user should use IPointer.Capture instead of MouseDevice.Capture,
-        // But on Windows we need to handle WM_MOUSE capture manually without having access to the Pointer. 
-        internal void Capture(IInputElement control)
+        public override void Capture(IInputElement control)
         {
-            _pointer.Capture(control);
-        }
-        
-        internal class WindowsMousePointer : Pointer
-        {
-            private WindowsMousePointer() : base(Pointer.GetNextFreeId(),PointerType.Mouse, true)
-            {
-            }
-            
-            public static WindowsMousePointer CreatePointer(out WindowsMousePointer pointer)
-            {
-                return pointer = new WindowsMousePointer();
-            }
+            base.Capture(control);
 
-            protected override void PlatformCapture(IInputElement element)
+            if (control != null)
             {
-                var hwnd = ((element?.GetVisualRoot() as TopLevel)?.PlatformImpl as WindowImpl)
-                    ?.Handle.Handle;
-
-                if (hwnd.HasValue && hwnd != IntPtr.Zero)
-                    UnmanagedMethods.SetCapture(hwnd.Value);
-                else
-                    UnmanagedMethods.ReleaseCapture();
+                UnmanagedMethods.SetCapture(CurrentWindow.Handle.Handle);
+            }
+            else
+            {
+                UnmanagedMethods.ReleaseCapture();
             }
         }
     }

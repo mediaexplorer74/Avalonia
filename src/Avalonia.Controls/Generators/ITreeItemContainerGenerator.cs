@@ -1,3 +1,8 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System.Collections.Generic;
+
 namespace Avalonia.Controls.Generators
 {
     /// <summary>
@@ -8,11 +13,6 @@ namespace Avalonia.Controls.Generators
         /// <summary>
         /// Gets the container index for the tree.
         /// </summary>
-        TreeContainerIndex? Index { get; }
-
-        /// <summary>
-        /// Updates the index based on the parent <see cref="TreeView"/>.
-        /// </summary>
-        void UpdateIndex();
+        TreeContainerIndex Index { get; }
     }
 }

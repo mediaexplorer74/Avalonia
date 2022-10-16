@@ -1,47 +1,31 @@
-using System.Threading;
 using Avalonia.Animation;
-using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Primitives;
+using Avalonia.VisualTree;
 
 namespace Avalonia.Controls
 {
-    /// <summary>
-    /// Direction in which an <see cref="Expander"/> control opens.
-    /// </summary>
     public enum ExpandDirection
     {
-        /// <summary>
-        /// Opens down.
-        /// </summary>
         Down,
-
-        /// <summary>
-        /// Opens up.
-        /// </summary>
         Up,
-
-        /// <summary>
-        /// Opens left.
-        /// </summary>
         Left,
-
-        /// <summary>
-        /// Opens right.
-        /// </summary>
         Right
     }
 
-    /// <summary>
-    /// A control with a header that has a collapsible content section.
-    /// </summary>
-    [PseudoClasses(":expanded", ":up", ":down", ":left", ":right")]
     public class Expander : HeaderedContentControl
     {
-        public static readonly StyledProperty<IPageTransition?> ContentTransitionProperty =
-            AvaloniaProperty.Register<Expander, IPageTransition?>(nameof(ContentTransition));
+        public static readonly DirectProperty<Expander, IPageTransition> ContentTransitionProperty =
+            AvaloniaProperty.RegisterDirect<Expander, IPageTransition>(
+                nameof(ContentTransition),
+                o => o.ContentTransition,
+                (o, v) => o.ContentTransition = v);
 
-        public static readonly StyledProperty<ExpandDirection> ExpandDirectionProperty =
-            AvaloniaProperty.Register<Expander, ExpandDirection>(nameof(ExpandDirection), ExpandDirection.Down);
+        public static readonly DirectProperty<Expander, ExpandDirection> ExpandDirectionProperty =
+            AvaloniaProperty.RegisterDirect<Expander, ExpandDirection>(
+                nameof(ExpandDirection),
+                o => o.ExpandDirection,
+                (o, v) => o.ExpandDirection = v,
+                ExpandDirection.Down);
 
         public static readonly DirectProperty<Expander, bool> IsExpandedProperty =
             AvaloniaProperty.RegisterDirect<Expander, bool>(
@@ -50,78 +34,57 @@ namespace Avalonia.Controls
                 (o, v) => o.IsExpanded = v,
                 defaultBindingMode: Data.BindingMode.TwoWay);
 
-        private bool _isExpanded;
-        private CancellationTokenSource? _lastTransitionCts;
-
         static Expander()
         {
-            IsExpandedProperty.Changed.AddClassHandler<Expander>((x, e) => x.OnIsExpandedChanged(e));
+            PseudoClass(ExpandDirectionProperty, d => d == ExpandDirection.Down, ":down");
+            PseudoClass(ExpandDirectionProperty, d => d == ExpandDirection.Up, ":up");
+            PseudoClass(ExpandDirectionProperty, d => d == ExpandDirection.Left, ":left");
+            PseudoClass(ExpandDirectionProperty, d => d == ExpandDirection.Right, ":right");
+
+            PseudoClass(IsExpandedProperty, ":expanded");
+
+            IsExpandedProperty.Changed.AddClassHandler<Expander>(x => x.OnIsExpandedChanged);
         }
 
-        public Expander()
+        public IPageTransition ContentTransition
         {
-            UpdatePseudoClasses(ExpandDirection);
-        }
-
-        public IPageTransition? ContentTransition
-        {
-            get => GetValue(ContentTransitionProperty);
-            set => SetValue(ContentTransitionProperty, value);
+            get { return _contentTransition; }
+            set { SetAndRaise(ContentTransitionProperty, ref _contentTransition, value); }
         }
 
         public ExpandDirection ExpandDirection
         {
-            get => GetValue(ExpandDirectionProperty);
-            set => SetValue(ExpandDirectionProperty, value);
+            get { return _expandDirection; }
+            set { SetAndRaise(ExpandDirectionProperty, ref _expandDirection, value); }
         }
 
         public bool IsExpanded
         {
             get { return _isExpanded; }
-            set 
-            { 
-                SetAndRaise(IsExpandedProperty, ref _isExpanded, value);
-                PseudoClasses.Set(":expanded", value);
-            }
+            set { SetAndRaise(IsExpandedProperty, ref _isExpanded, value); }
         }
 
-        protected virtual async void OnIsExpandedChanged(AvaloniaPropertyChangedEventArgs e)
+        protected virtual void OnIsExpandedChanged(AvaloniaPropertyChangedEventArgs e)
         {
-            if (Content != null && ContentTransition != null && Presenter is Visual visualContent)
+            IVisual visualContent = Presenter;
+
+            if (Content != null && ContentTransition != null && visualContent != null)
             {
                 bool forward = ExpandDirection == ExpandDirection.Left ||
                                 ExpandDirection == ExpandDirection.Up;
-
-                _lastTransitionCts?.Cancel();
-                _lastTransitionCts = new CancellationTokenSource();
-
                 if (IsExpanded)
                 {
-                    await ContentTransition.Start(null, visualContent, forward, _lastTransitionCts.Token);
+                    ContentTransition.Start(null, visualContent, forward);
                 }
                 else
                 {
-                    await ContentTransition.Start(visualContent, null, forward, _lastTransitionCts.Token);
+                    ContentTransition.Start(visualContent, null, !forward);
                 }
             }
         }
 
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            if (change.Property == ExpandDirectionProperty)
-            {
-                UpdatePseudoClasses(change.GetNewValue<ExpandDirection>());
-            }
-        }
-
-        private void UpdatePseudoClasses(ExpandDirection d)
-        {
-            PseudoClasses.Set(":up", d == ExpandDirection.Up);
-            PseudoClasses.Set(":down", d == ExpandDirection.Down);
-            PseudoClasses.Set(":left", d == ExpandDirection.Left);
-            PseudoClasses.Set(":right", d == ExpandDirection.Right);
-        }
+        private IPageTransition _contentTransition;
+        private ExpandDirection _expandDirection;
+        private bool _isExpanded;
     }
 }

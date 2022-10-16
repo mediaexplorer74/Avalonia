@@ -1,3 +1,6 @@
+// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
 namespace Avalonia.Controls
 {
     /// <summary>
@@ -9,29 +12,19 @@ namespace Avalonia.Controls
         /// Defines the <see cref="MaxHeight"/> property.
         /// </summary>
         public static readonly StyledProperty<double> MaxHeightProperty =
-            AvaloniaProperty.Register<RowDefinition, double>(nameof(MaxHeight), double.PositiveInfinity);
+            AvaloniaProperty.Register<RowDefinition, double>("MaxHeight", double.PositiveInfinity);
 
         /// <summary>
         /// Defines the <see cref="MinHeight"/> property.
         /// </summary>
         public static readonly StyledProperty<double> MinHeightProperty =
-            AvaloniaProperty.Register<RowDefinition, double>(nameof(MinHeight));
+            AvaloniaProperty.Register<RowDefinition, double>("MinHeight");
 
         /// <summary>
         /// Defines the <see cref="Height"/> property.
         /// </summary>
         public static readonly StyledProperty<GridLength> HeightProperty =
-            AvaloniaProperty.Register<RowDefinition, GridLength>(nameof(Height), new GridLength(1, GridUnitType.Star));
-
-        /// <summary>
-        /// Initializes static members of the <see cref="RowDefinition"/> class.
-        /// </summary>
-        static RowDefinition()
-        {
-            AffectsParentMeasure(MaxHeightProperty, MinHeightProperty);
-
-            HeightProperty.Changed.AddClassHandler<DefinitionBase>(OnUserSizePropertyChanged);
-        }
+            AvaloniaProperty.Register<RowDefinition, GridLength>("Height", new GridLength(1, GridUnitType.Star));
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RowDefinition"/> class.
@@ -62,21 +55,19 @@ namespace Avalonia.Controls
         /// <summary>
         /// Gets the actual calculated height of the row.
         /// </summary>
-        public double ActualHeight => Parent?.GetFinalRowDefinitionHeight(Index) ?? 0d;
+        public double ActualHeight
+        {
+            get;
+            internal set;
+        }
 
         /// <summary>
         /// Gets or sets the maximum height of the row in DIPs.
         /// </summary>
         public double MaxHeight
         {
-            get
-            {
-                return GetValue(MaxHeightProperty);
-            }
-            set
-            {
-                SetValue(MaxHeightProperty, value);
-            }
+            get { return GetValue(MaxHeightProperty); }
+            set { SetValue(MaxHeightProperty, value); }
         }
 
         /// <summary>
@@ -84,14 +75,8 @@ namespace Avalonia.Controls
         /// </summary>
         public double MinHeight
         {
-            get
-            {
-                return GetValue(MinHeightProperty);
-            }
-            set
-            {
-                SetValue(MinHeightProperty, value);
-            }
+            get { return GetValue(MinHeightProperty); }
+            set { SetValue(MinHeightProperty, value); }
         }
 
         /// <summary>
@@ -99,18 +84,8 @@ namespace Avalonia.Controls
         /// </summary>
         public GridLength Height
         {
-            get
-            {
-                return GetValue(HeightProperty);
-            }
-            set
-            {
-                SetValue(HeightProperty, value);
-            }
+            get { return GetValue(HeightProperty); }
+            set { SetValue(HeightProperty, value); }
         }
-
-        internal override GridLength UserSizeValueCache => this.Height;
-        internal override double UserMinSizeValueCache => this.MinHeight;
-        internal override double UserMaxSizeValueCache => this.MaxHeight;
     }
 }

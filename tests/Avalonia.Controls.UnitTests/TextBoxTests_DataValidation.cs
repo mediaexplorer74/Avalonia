@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) The Avalonia Project. All rights reserved.
+// Licensed under the MIT license. See licence.md file in the project root for full license information.
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -6,7 +9,7 @@ using System.Linq;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
-using Avalonia.Markup.Data;
+using Avalonia.Markup.Xaml.Data;
 using Avalonia.Platform;
 using Avalonia.UnitTests;
 using Moq;
@@ -30,16 +33,16 @@ namespace Avalonia.Controls.UnitTests
 
                 target.ApplyTemplate();
 
-                Assert.DoesNotContain(":error", target.Classes);
+                Assert.False(target.Classes.Contains(":error"));
                 target.Text = "20";
-                Assert.Contains(":error", target.Classes);
+                Assert.True(target.Classes.Contains(":error"));
                 target.Text = "1";
-                Assert.DoesNotContain(":error", target.Classes);
+                Assert.False(target.Classes.Contains(":error"));
             }
         }
 
         [Fact]
-        public void Setter_Exceptions_Should_Set_DataValidationErrors_Errors()
+        public void Setter_Exceptions_Should_Set_DataValidationErrors()
         {
             using (UnitTestApplication.Start(Services))
             {
@@ -52,47 +55,21 @@ namespace Avalonia.Controls.UnitTests
 
                 target.ApplyTemplate();
 
-                Assert.Null(DataValidationErrors.GetErrors(target));
+                Assert.Null(target.DataValidationErrors);
                 target.Text = "20";
-
-                IEnumerable<object> errors = DataValidationErrors.GetErrors(target);
-                Assert.Single(errors);
-                Assert.IsType<InvalidOperationException>(errors.Single());
+                Assert.Equal(1, target.DataValidationErrors.Count());
+                Assert.IsType<InvalidOperationException>(target.DataValidationErrors.Single());
                 target.Text = "1";
-                Assert.Null(DataValidationErrors.GetErrors(target));
-            }
-        }
-
-        [Fact]
-        public void Setter_Exceptions_Should_Set_DataValidationErrors_HasErrors()
-        {
-            using (UnitTestApplication.Start(Services))
-            {
-                var target = new TextBox
-                {
-                    DataContext = new ExceptionTest(),
-                    [!TextBox.TextProperty] = new Binding(nameof(ExceptionTest.LessThan10), BindingMode.TwoWay),
-                    Template = CreateTemplate(),
-                };
-
-                target.ApplyTemplate();
-
-                Assert.False(DataValidationErrors.GetHasErrors(target));
-                target.Text = "20";
-                Assert.True(DataValidationErrors.GetHasErrors(target));
-                target.Text = "1";
-                Assert.False(DataValidationErrors.GetHasErrors(target));
+                Assert.Null(target.DataValidationErrors);
             }
         }
 
         private static TestServices Services => TestServices.MockThreadingInterface.With(
-            standardCursorFactory: Mock.Of<ICursorFactory>(),
-            textShaperImpl: new MockTextShaperImpl(),
-            fontManagerImpl: new MockFontManagerImpl());
+            standardCursorFactory: Mock.Of<IStandardCursorFactory>());
 
         private IControlTemplate CreateTemplate()
         {
-            return new FuncControlTemplate<TextBox>((control, scope) =>
+            return new FuncControlTemplate<TextBox>(control =>
                 new TextPresenter
                 {
                     Name = "PART_TextPresenter",
@@ -103,7 +80,7 @@ namespace Avalonia.Controls.UnitTests
                         Priority = BindingPriority.TemplatedParent,
                         RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
                     },
-                }.RegisterInNameScope(scope));
+                });
         }
 
         private class ExceptionTest

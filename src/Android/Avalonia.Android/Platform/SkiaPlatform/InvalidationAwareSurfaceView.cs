@@ -1,23 +1,27 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using Android.App;
 using Android.Content;
 using Android.Graphics;
 using Android.OS;
 using Android.Runtime;
 using Android.Util;
 using Android.Views;
-using Avalonia.Android.Platform.SkiaPlatform;
+using Android.Widget;
+using Avalonia.Media;
 using Avalonia.Platform;
 
 namespace Avalonia.Android
 {
-    public abstract class InvalidationAwareSurfaceView : SurfaceView, ISurfaceHolderCallback, IPlatformNativeSurfaceHandle
+    public abstract class InvalidationAwareSurfaceView : SurfaceView, ISurfaceHolderCallback, IPlatformHandle
     {
         bool _invalidateQueued;
         readonly object _lock = new object();
         private readonly Handler _handler;
-
-        IntPtr IPlatformHandle.Handle =>
-            AndroidFramebuffer.ANativeWindow_fromSurface(JNIEnv.Handle, Holder.Surface.Handle);
+        
 
         public InvalidationAwareSurfaceView(Context context) : base(context)
         {
@@ -29,7 +33,7 @@ namespace Avalonia.Android
         {
             lock (_lock)
             {
-                if (_invalidateQueued)
+                if(_invalidateQueued)
                     return;
                 _handler.Post(() =>
                 {
@@ -47,6 +51,16 @@ namespace Avalonia.Android
             }
         }
 
+        public override void Invalidate(global::Android.Graphics.Rect dirty)
+        {
+            Invalidate();
+        }
+
+        public override void Invalidate(int l, int t, int r, int b)
+        {
+            Invalidate();
+        }
+
         public void SurfaceChanged(ISurfaceHolder holder, Format format, int width, int height)
         {
             Log.Info("AVALONIA", "Surface Changed");
@@ -62,7 +76,7 @@ namespace Avalonia.Android
         public void SurfaceDestroyed(ISurfaceHolder holder)
         {
             Log.Info("AVALONIA", "Surface Destroyed");
-
+            
         }
 
         protected void DoDraw()
@@ -75,9 +89,5 @@ namespace Avalonia.Android
         }
         protected abstract void Draw();
         public string HandleDescriptor => "SurfaceView";
-
-        public PixelSize Size => new PixelSize(Holder.SurfaceFrame.Width(), Holder.SurfaceFrame.Height());
-
-        public double Scaling => Resources.DisplayMetrics.Density;
     }
 }

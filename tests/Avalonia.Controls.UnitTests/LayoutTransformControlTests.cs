@@ -1,6 +1,7 @@
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Shapes;
+using Avalonia.Controls.Templates;
 using Avalonia.Media;
-using Avalonia.UnitTests;
 using Xunit;
 
 namespace Avalonia.Controls.UnitTests
@@ -27,52 +28,6 @@ namespace Avalonia.Controls.UnitTests
                 new Size(100, 50),
                 new ScaleTransform() { ScaleX = scale, ScaleY = scale },
                 new Size(50, 25));
-        }
-
-        [Fact]
-        public void Measure_On_Skew_X_axis_45_degrees_Is_Correct()
-        {
-            TransformMeasureSizeTest(
-                new Size(100, 100),
-                new SkewTransform() { AngleX = 45 },
-                new Size(200, 100));
-
-        }
-
-        [Fact]
-        public void Measure_On_Skew_Y_axis_45_degrees_Is_Correct()
-        {
-            TransformMeasureSizeTest(
-                new Size(100, 100),
-                new SkewTransform() { AngleY = 45 },
-                new Size(100, 200));
-        }
-
-        [Fact]
-        public void Measure_On_Skew_X_axis_minus_45_degrees_Is_Correct()
-        {
-            TransformMeasureSizeTest(
-                new Size(100, 100),
-                new SkewTransform() { AngleX = -45 },
-                new Size(200, 100));
-        }
-
-        [Fact]
-        public void Measure_On_Skew_Y_axis_minus_45_degrees_Is_Correct()
-        {
-            TransformMeasureSizeTest(
-                new Size(100, 100),
-                new SkewTransform() { AngleY = -45 },
-                new Size(100, 200));
-        }
-
-        [Fact]
-        public void Measure_On_Skew_0_degrees_Is_Correct()
-        {
-            TransformMeasureSizeTest(
-                new Size(100, 100),
-                new SkewTransform() { AngleX = 0, AngleY = 0 },
-                new Size(100, 100));
         }
 
         [Fact]
@@ -170,10 +125,8 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
-        public void Should_Generate_RotateTransform_90_degrees()
+        public void Should_Generate_RenderTransform_90_degrees()
         {
-            using var app = UnitTestApplication.Start(TestServices.MockPlatformRenderInterface);
-
             LayoutTransformControl lt = CreateWithChildAndMeasureAndTransform(
                                         100,
                                         25,
@@ -194,10 +147,8 @@ namespace Avalonia.Controls.UnitTests
         }
 
         [Fact]
-        public void Should_Generate_RotateTransform_minus_90_degrees()
+        public void Should_Generate_RenderTransform_minus_90_degrees()
         {
-            using var app = UnitTestApplication.Start(TestServices.MockPlatformRenderInterface);
-
             LayoutTransformControl lt = CreateWithChildAndMeasureAndTransform(
                                         100,
                                         25,
@@ -220,8 +171,6 @@ namespace Avalonia.Controls.UnitTests
         [Fact]
         public void Should_Generate_ScaleTransform_x2()
         {
-            using var app = UnitTestApplication.Start(TestServices.MockPlatformRenderInterface);
-
             LayoutTransformControl lt = CreateWithChildAndMeasureAndTransform(
                                         100,
                                         50,
@@ -240,58 +189,8 @@ namespace Avalonia.Controls.UnitTests
             Assert.Equal(m.M32, res.M32, 3);
         }
 
-        [Fact]
-        public void Should_Generate_SkewTransform_45_degrees()
-        {
-            using var app = UnitTestApplication.Start(TestServices.MockPlatformRenderInterface);
-
-            LayoutTransformControl lt = CreateWithChildAndMeasureAndTransform(
-                                        100,
-                                        100,
-                                        new SkewTransform() { AngleX = 45, AngleY = 45 });
-
-            Assert.NotNull(lt.TransformRoot.RenderTransform);
-
-            Matrix m = lt.TransformRoot.RenderTransform.Value;
-
-            Matrix res = Matrix.CreateSkew(Matrix.ToRadians(45), Matrix.ToRadians(45));
-
-            Assert.Equal(m.M11, res.M11, 3);
-            Assert.Equal(m.M12, res.M12, 3);
-            Assert.Equal(m.M21, res.M21, 3);
-            Assert.Equal(m.M22, res.M22, 3);
-            Assert.Equal(m.M31, res.M31, 3);
-            Assert.Equal(m.M32, res.M32, 3);
-        }
-
-        [Fact]
-        public void Should_Generate_SkewTransform_minus_45_degrees()
-        {
-            using var app = UnitTestApplication.Start(TestServices.MockPlatformRenderInterface);
-
-            LayoutTransformControl lt = CreateWithChildAndMeasureAndTransform(
-                                        100,
-                                        100,
-                                        new SkewTransform() { AngleX = -45, AngleY = -45 });
-
-            Assert.NotNull(lt.TransformRoot.RenderTransform);
-
-            Matrix m = lt.TransformRoot.RenderTransform.Value;
-
-            Matrix res = Matrix.CreateSkew(Matrix.ToRadians(-45), Matrix.ToRadians(-45));
-
-            Assert.Equal(m.M11, res.M11, 3);
-            Assert.Equal(m.M12, res.M12, 3);
-            Assert.Equal(m.M21, res.M21, 3);
-            Assert.Equal(m.M22, res.M22, 3);
-            Assert.Equal(m.M31, res.M31, 3);
-            Assert.Equal(m.M32, res.M32, 3);
-        }
-
         private static void TransformMeasureSizeTest(Size size, Transform transform, Size expectedSize)
         {
-            using var app = UnitTestApplication.Start(TestServices.MockPlatformRenderInterface);
-
             LayoutTransformControl lt = CreateWithChildAndMeasureAndTransform(
                 size.Width,
                 size.Height,
@@ -305,8 +204,6 @@ namespace Avalonia.Controls.UnitTests
 
         private static void TransformRootBoundsTest(Size size, Transform transform, Rect expectedBounds)
         {
-            using var app = UnitTestApplication.Start(TestServices.MockPlatformRenderInterface);
-
             LayoutTransformControl lt = CreateWithChildAndMeasureAndTransform(size.Width, size.Height, transform);
 
             Rect outBounds = lt.TransformRoot.Bounds;
@@ -324,10 +221,20 @@ namespace Avalonia.Controls.UnitTests
         {
             var lt = new LayoutTransformControl()
             {
-                LayoutTransform = transform
+                LayoutTransform = transform,
+                Template = new FuncControlTemplate<LayoutTransformControl>(
+                                p => new ContentPresenter() { Content = p.Content })
             };
 
-            lt.Child = new Rectangle() { Width = width, Height = height };
+            lt.Content = new Rectangle() { Width = width, Height = height };
+
+            lt.ApplyTemplate();
+
+            //we need to force create visual child
+            //so the measure after is correct
+            (lt.Presenter as ContentPresenter).UpdateChild();
+
+            Assert.NotNull(lt.Presenter?.Child);
 
             lt.Measure(Size.Infinity);
             lt.Arrange(new Rect(lt.DesiredSize));
